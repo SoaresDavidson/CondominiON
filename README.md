@@ -116,6 +116,12 @@ Para ver as rotas da API:
 docker compose run --rm backend bin/rails routes
 ```
 
+Para rodar a suite de testes do backend:
+
+```bash
+docker compose run --rm -e RAILS_ENV=test backend bin/rails test
+```
+
 ## Rodando o Frontend
 
 Entre na pasta do frontend:
@@ -190,6 +196,7 @@ docker compose logs -f backend
 docker compose run --rm backend bin/rails db:prepare
 docker compose run --rm backend bin/rails db:seed
 docker compose run --rm backend bin/rails routes
+docker compose run --rm -e RAILS_ENV=test backend bin/rails test
 ```
 
 Frontend:
