@@ -1,0 +1,46 @@
+services:
+  backend:
+    build:
+      context: ./Backend
+    container_name: condominio-backend
+    restart: unless-stopped
+    command: >
+      sh -c "bin/rails db:prepare &&
+             bin/rails server -b 0.0.0.0 -p 3000"
+    environment:
+      RAILS_ENV: ${RAILS_ENV:-development}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-development-only-secret-key}
+      RAILS_CORS_ALLOWED_ORIGINS: ${RAILS_CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      POSTGRES_DB: ${POSTGRES_DB:-condominio}
+      POSTGRES_USER: ${POSTGRES_USER:-condominio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-condominio}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    volumes:
+      - ./Backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: condominio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-condominio}
+      POSTGRES_USER: ${POSTGRES_USER:-condominio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-condominio}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

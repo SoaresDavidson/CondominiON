@@ -1,0 +1,16 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.sqlite3
+Backend/media/
+Backend/staticfiles/
+Backend/tmp/*
+Backend/log/*
+Backend/storage/*
+Backend/vendor/bundle/
+Backend/.bundle/
+!Backend/tmp/.keep
+!Backend/log/.keep
+!Backend/storage/.keep
