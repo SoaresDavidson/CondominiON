@@ -5,6 +5,7 @@ end
 admin = condominium.users.find_or_create_by!(email: "joao.silva@email.com") do |user|
   user.name = "Joao Silva"
   user.role = :administrator
+  user.password = "condominio123"
 end
 
 owner = condominium.users.find_or_create_by!(email: "maria.oliveira@email.com") do |user|
@@ -12,6 +13,7 @@ owner = condominium.users.find_or_create_by!(email: "maria.oliveira@email.com") 
   user.role = :owner
   user.lots_count = 2
   user.houses_count = 1
+  user.password = "condominio123"
 end
 
 meeting = condominium.meetings.find_or_create_by!(title: "Assembleia Geral Ordinaria - Mai/2026") do |record|

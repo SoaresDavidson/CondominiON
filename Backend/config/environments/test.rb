@@ -3,5 +3,6 @@ Rails.application.configure do
   config.eager_load = ENV["CI"].present?
   config.public_file_server.enabled = true
   config.consider_all_requests_local = true
+  config.active_job.queue_adapter = :test
 end
 

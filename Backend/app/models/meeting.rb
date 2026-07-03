@@ -22,7 +22,9 @@ class Meeting < ApplicationRecord
   validate :starts_at_cannot_be_in_the_past, on: :create
 
   def start!
-    raise ActiveRecord::RecordInvalid, self unless scheduled?
+    errors.add(:base, "reuniao precisa estar agendada") unless scheduled?
+    errors.add(:starts_at, "reuniao nao pode ser iniciada com mais de 10 minutos de antecedencia") if starts_at > 10.minutes.from_now
+    raise ActiveRecord::RecordInvalid, self if errors.any?
 
     update!(status: :in_progress)
   end

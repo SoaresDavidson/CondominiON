@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_02_000800) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_02_001200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -21,6 +21,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_02_000800) do
     t.string "attachment_url"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "position", default: 1, null: false
+    t.index ["meeting_id", "position"], name: "index_agenda_items_on_meeting_id_and_position", unique: true
     t.index ["meeting_id"], name: "index_agenda_items_on_meeting_id"
   end
 
@@ -32,6 +34,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_02_000800) do
     t.datetime "cast_at", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "ip_address"
+    t.string "user_agent"
     t.index ["user_id"], name: "index_ballots_on_user_id"
     t.index ["vote_id", "user_id"], name: "index_ballots_on_vote_id_and_user_id", unique: true
     t.index ["vote_id"], name: "index_ballots_on_vote_id"
@@ -85,10 +89,17 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_02_000800) do
     t.boolean "delinquent", default: false, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "password_digest"
+    t.string "access_token"
+    t.string "active_session_token"
+    t.string "reset_password_token"
+    t.datetime "reset_password_sent_at"
+    t.index ["access_token"], name: "index_users_on_access_token", unique: true
     t.index ["condominium_id", "email"], name: "index_users_on_condominium_id_and_email", unique: true
     t.index ["condominium_id"], name: "index_users_on_condominium_id"
     t.index ["meeting_id"], name: "index_users_on_meeting_id"
     t.index ["proxy_for_id"], name: "index_users_on_proxy_for_id"
+    t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
   create_table "vote_options", force: :cascade do |t|

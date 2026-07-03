@@ -13,6 +13,8 @@ Prefixo da API: `/api/v1`
 - Endpoints de exclusao de usuario fazem desativacao logica (`active=false`).
 - Em votacao aberta, o resultado inclui historico nominal dos votos.
 - Em votacao fechada, o resultado omite o historico nominal.
+- Todos os endpoints em `/api/v1`, exceto `/sessions` (create), `/meeting_accesses` e `/password_resets`, exigem o
+  header `Authorization: Bearer <token>` obtido no login ou na troca de token de acesso. Ver secao "Autenticacao".
 
 ## Erros
 
@@ -31,6 +33,22 @@ Prefixo da API: `/api/v1`
   "error": [
     "Email has already been taken"
   ]
+}
+```
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "token invalido"
+}
+```
+
+### 403 Forbidden
+
+```json
+{
+  "error": "acesso negado para este perfil"
 }
 ```
 
@@ -86,6 +104,82 @@ Resposta `200`:
   "status": "ok"
 }
 ```
+
+## Autenticacao
+
+Administrador e Proprietario autenticam com email/senha e recebem um token de longa duracao ("acesso
+autenticado permanente"). Convidado e Procurador nao tem senha: recebem um `access_token` de uso unico no
+cadastro (ver `POST /condominiums/:condominium_id/users`) e o trocam por um token JWT escopado a sua reuniao.
+Um novo login de Convidado/Procurador invalida o token anterior (sessao unica).
+
+### POST `/api/v1/sessions`
+
+Login de Administrador/Proprietario.
+
+Payload:
+
+```json
+{
+  "email": "joao.silva@email.com",
+  "password": "condominio123"
+}
+```
+
+Resposta `201`:
+
+```json
+{
+  "token": "<jwt>",
+  "user": { "id": 1, "role": "administrator", "...": "..." }
+}
+```
+
+Resposta `401` em caso de credenciais invalidas.
+
+### DELETE `/api/v1/sessions`
+
+Encerra a sessao atual (requer `Authorization`). Para Convidado/Procurador invalida o token ativo.
+
+Resposta `204`: sem corpo.
+
+### POST `/api/v1/meeting_accesses`
+
+Troca o `access_token` de Convidado/Procurador por um JWT escopado a reuniao vinculada.
+
+Payload:
+
+```json
+{
+  "access_token": "3f9c..."
+}
+```
+
+Resposta `201`: igual ao login (`token` + `user`). Resposta `401` se o token for invalido.
+
+### POST `/api/v1/password_resets`
+
+Solicita recuperacao de senha (somente Administrador/Proprietario).
+
+Payload: `{ "email": "joao.silva@email.com" }`
+
+Resposta `200`:
+
+```json
+{
+  "message": "Se o e-mail estiver cadastrado, voce recebera um link de recuperacao."
+}
+```
+
+Fora do ambiente de producao, a resposta tambem inclui `reset_token` para uso manual, ja que o envio por
+e-mail ainda nao esta implementado (ver `Docs/Plano_Implementacao.md`, Fase 4).
+
+### PATCH `/api/v1/password_resets/:token`
+
+Redefine a senha usando o token gerado acima (valido por 1 hora).
+
+Payload: `{ "password": "novaSenha123" }`
+
+Resposta `200` em caso de sucesso, `422` se o token for invalido/expirado.
 
 ## Condominios
 
@@ -270,6 +364,8 @@ Resposta `200`: objeto `Meeting` com `status="in_progress"`.
 Regras:
 
 - A reuniao precisa estar com `status="scheduled"`.
+- `starts_at` nao pode ser mais de 10 minutos no futuro (evita inicio adiantado demais).
+- Somente Administrador pode iniciar.
 
 ### PATCH `/api/v1/meetings/:id/finish`
 
@@ -321,6 +417,12 @@ Resposta `201`:
   }
 }
 ```
+
+Regras:
+
+- `user_id` precisa ser o proprio usuario autenticado (Administrador pode registrar presenca de terceiros).
+- O papel do usuario precisa ser compativel com `meeting_type`: `administrators_only` aceita somente
+  `administrator`; `with_owners` aceita `administrator`/`owner`; `with_guests` aceita qualquer papel.
 
 ### POST `/api/v1/meetings/:id/send_invitations`
 
@@ -429,15 +531,20 @@ Payload de convidado:
 }
 ```
 
-Resposta `201`: objeto `User`.
+Resposta `201`: objeto `User`. Para `administrator`/`owner`, inclui tambem `initial_password` (senha inicial
+gerada aleatoriamente). Para `proxy`/`guest`, inclui `access_token` (usado em `POST /meeting_accesses`). Em
+ambos os casos esses campos so aparecem na resposta de criacao — envio automatico por e-mail ainda nao esta
+implementado (ver `Docs/Plano_Implementacao.md`, Fase 4).
 
 Regras:
 
 - `email` deve ser unico por condominio.
 - `proxy` precisa de `proxy_for_id` e `meeting_id`.
+- `proxy_for_id` precisa apontar para um proprietario adimplente.
 - `guest` precisa de `meeting_id`.
 - `owner` calcula `vote_weight` como `(lots_count * 2) + houses_count`.
 - `proxy` herda `vote_weight` do proprietario representado.
+- Somente Administrador pode criar/atualizar/desativar usuarios.
 
 ### PATCH `/api/v1/users/:id`
 
@@ -481,6 +588,7 @@ Resposta `200`: objeto `User` com `active=false`.
   "title": "Item 01 - Aprovacao do Orcamento Anual",
   "description": "Votacao sobre a previsao orcamentaria do exercicio de 2026.",
   "attachment_url": null,
+  "position": 1,
   "created_at": "2026-07-02T21:53:14.672Z",
   "updated_at": "2026-07-02T21:53:14.672Z"
 }
@@ -509,12 +617,19 @@ Payload:
   "agenda_item": {
     "title": "Item 01 - Aprovacao do Orcamento Anual",
     "description": "Discussao e votacao da previsao orcamentaria.",
-    "attachment_url": "https://exemplo.com/orcamento.pdf"
+    "attachment_url": "https://exemplo.com/orcamento.pdf",
+    "position": 1
   }
 }
 ```
 
 Resposta `201`: objeto `AgendaItem`.
+
+Regras:
+
+- `position` e opcional; se omitido, a API atribui a proxima posicao livre da reuniao.
+- `position` precisa ser unico dentro da mesma reuniao.
+- Somente Administrador pode criar/atualizar/excluir pautas.
 
 ### PATCH `/api/v1/agenda_items/:id`
 
@@ -538,7 +653,8 @@ Resposta `200`: objeto `AgendaItem`.
 
 Remove uma pauta.
 
-Resposta `204`: sem corpo.
+Resposta `204`: sem corpo. Resposta `422` se a pauta tiver uma votacao com `status="active"`; votacoes
+`waiting`/`closed` vinculadas sao removidas junto com a pauta.
 
 ## Votacoes
 
@@ -622,8 +738,12 @@ Regras:
 
 - `duration_minutes` precisa ser inteiro maior que zero.
 - A pauta precisa pertencer a reuniao informada.
+- A pauta so pode ter uma votacao cadastrada.
 - Votacoes novas ficam com `status="waiting"` se o status nao for enviado.
 - Para `yes_no_abstain`, se a votacao for iniciada sem opcoes, a API cria `Sim`, `Nao` e `Abstencao`.
+- Ao iniciar (`PATCH .../start`), a votacao e encerrada automaticamente quando `closes_at` e atingido (processamento
+  assincrono em segundo plano).
+- Somente Administrador pode criar/atualizar/excluir/iniciar/encerrar votacoes.
 
 ### PATCH `/api/v1/votes/:id`
 
@@ -826,7 +946,7 @@ Resposta `204`: sem corpo.
 
 ### GET `/api/v1/votes/:vote_id/ballots`
 
-Lista votos registrados em uma votacao.
+Lista votos registrados em uma votacao. Somente Administrador.
 
 Resposta `200`: lista de `Ballot`.
 
@@ -858,13 +978,21 @@ Resposta `201`:
 
 Regras:
 
+- `user_id` precisa ser o proprio usuario autenticado (nao e possivel votar em nome de outro usuario).
 - A votacao precisa estar `active`.
 - A opcao precisa pertencer a votacao.
 - O usuario precisa estar presente na reuniao.
 - O usuario so pode votar uma vez por votacao.
 - O peso do voto e copiado de `user.vote_weight` no momento do registro.
+- IP e user-agent da requisicao sao gravados para fins de auditoria (colunas `ip_address`/`user_agent` na
+  tabela `ballots`), mas nao sao expostos nos payloads de resposta.
 
 ## Fluxos Recomendados
+
+### Login (Administrador/Proprietario)
+
+1. `POST /api/v1/sessions`
+2. Usar o `token` retornado no header `Authorization: Bearer <token>` das chamadas seguintes.
 
 ### Criar e iniciar uma reuniao
 
@@ -878,10 +1006,11 @@ Regras:
 2. `POST /api/v1/votes/:vote_id/vote_options`, quando aplicavel.
 3. `PATCH /api/v1/votes/:id/start`
 
-### Participar e votar
+### Participar e votar (Convidado/Procurador)
 
-1. `POST /api/v1/meetings/:id/join`
-2. `GET /api/v1/meetings/:meeting_id/votes?status=active`
-3. `POST /api/v1/votes/:vote_id/ballots`
-4. `GET /api/v1/votes/:id/result`
+1. `POST /api/v1/meeting_accesses` com o `access_token` recebido no cadastro.
+2. `POST /api/v1/meetings/:id/join`
+3. `GET /api/v1/meetings/:meeting_id/votes?status=active`
+4. `POST /api/v1/votes/:vote_id/ballots`
+5. `GET /api/v1/votes/:id/result`
 

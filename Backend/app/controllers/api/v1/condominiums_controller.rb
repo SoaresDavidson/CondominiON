@@ -1,10 +1,13 @@
 module Api
   module V1
-    class CondominiumsController < ApplicationController
+    class CondominiumsController < BaseController
       before_action :set_condominium, only: %i[show update destroy]
+      before_action -> { authorize_roles!("administrator") }, only: %i[create update destroy]
+      before_action -> { authorize_condominium_scope!(@condominium) }, only: %i[show update destroy]
 
       def index
-        render json: Condominium.order(:name)
+        scope = current_user.administrator? ? Condominium.all : Condominium.where(id: current_user.condominium_id)
+        render json: scope.order(:name)
       end
 
       def show

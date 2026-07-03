@@ -3,7 +3,7 @@
 Banco: PostgreSQL  
 ORM: Active Record / Ruby on Rails  
 Fonte: `Backend/db/schema.rb`  
-Versao do schema: `2026_07_02_000800`
+Versao do schema: `2026_07_02_001200`
 
 ## Visao Geral
 
@@ -79,6 +79,11 @@ Armazena administradores, proprietarios, procuradores e convidados.
 | `vote_weight` | `decimal(10,2)` | Sim | `0.0` | Peso total do voto. |
 | `active` | `boolean` | Sim | `true` | Indica se o usuario esta ativo. |
 | `delinquent` | `boolean` | Sim | `false` | Indica inadimplencia. |
+| `password_digest` | `string` | Nao | - | Hash da senha (somente `administrator`/`owner`). |
+| `access_token` | `string` | Nao | - | Token de acesso unico (somente `proxy`/`guest`). |
+| `active_session_token` | `string` | Nao | - | `jti` da sessao ativa (usado para invalidar sessoes anteriores de `proxy`/`guest`). |
+| `reset_password_token` | `string` | Nao | - | Token de recuperacao de senha. |
+| `reset_password_sent_at` | `datetime` | Nao | - | Data de geracao do token de recuperacao. |
 | `created_at` | `datetime` | Sim | auto | Data de criacao. |
 | `updated_at` | `datetime` | Sim | auto | Data da ultima atualizacao. |
 
@@ -99,6 +104,8 @@ Indices:
 | `index_users_on_condominium_id` | `condominium_id` | Nao |
 | `index_users_on_meeting_id` | `meeting_id` | Nao |
 | `index_users_on_proxy_for_id` | `proxy_for_id` | Nao |
+| `index_users_on_access_token` | `access_token` | Sim |
+| `index_users_on_reset_password_token` | `reset_password_token` | Sim |
 
 Chaves estrangeiras:
 
@@ -114,7 +121,10 @@ Regras aplicadas no model:
 - `owner` calcula `vote_weight` como `(lots_count * 2) + houses_count`.
 - `proxy` herda o peso do proprietario representado.
 - `proxy` exige `proxy_for_id` e `meeting_id`.
+- `proxy_for_id` precisa apontar para um proprietario adimplente.
 - `guest` exige `meeting_id`.
+- `password_digest` e gerenciado via `has_secure_password` (somente `administrator`/`owner` autenticam com senha).
+- `access_token` e gerado automaticamente para `proxy`/`guest` no cadastro.
 
 ## Tabela `meetings`
 
@@ -169,6 +179,14 @@ Relacionamentos:
 - Possui muitas `votes`.
 - Possui muitas presencas em `meeting_users`.
 
+Regras aplicadas no model:
+
+- `starts_at` nao pode estar no passado no cadastro.
+- So pode ser iniciada (`status="in_progress"`) se estiver `scheduled` e `starts_at` nao for mais de 10 minutos
+  no futuro.
+- So pode ser finalizada se nao houver `votes` com `status="waiting"` ou `status="active"`.
+- So pode ser cancelada se estiver `scheduled`.
+
 ## Tabela `meeting_users`
 
 Registra presenca de usuarios em reunioes.
@@ -213,6 +231,7 @@ Armazena as pautas vinculadas a uma reuniao.
 | `title` | `string` | Sim | - | Titulo da pauta. |
 | `description` | `text` | Nao | - | Descricao detalhada. |
 | `attachment_url` | `string` | Nao | - | URL ou caminho de anexo. |
+| `position` | `integer` | Sim | `1` | Ordem de exibicao dentro da reuniao. |
 | `created_at` | `datetime` | Sim | auto | Data de criacao. |
 | `updated_at` | `datetime` | Sim | auto | Data da ultima atualizacao. |
 
@@ -221,6 +240,7 @@ Indices:
 | Nome | Colunas | Unico |
 | --- | --- | --- |
 | `index_agenda_items_on_meeting_id` | `meeting_id` | Nao |
+| `index_agenda_items_on_meeting_id_and_position` | `meeting_id`, `position` | Sim |
 
 Chaves estrangeiras:
 
@@ -232,6 +252,12 @@ Relacionamentos:
 
 - Pertence a uma `meeting`.
 - Pode ter muitas `votes`.
+
+Regras aplicadas no model:
+
+- `position` e unico dentro da mesma reuniao; se omitido na criacao, a API atribui a proxima posicao livre.
+- Nao pode ser excluida se possuir uma `vote` com `status="active"`; votacoes `waiting`/`closed` vinculadas sao
+  removidas junto com a pauta.
 
 ## Tabela `votes`
 
@@ -294,8 +320,11 @@ Regras aplicadas no model:
 
 - `duration_minutes` deve ser inteiro maior que zero.
 - A pauta deve pertencer a mesma reuniao da votacao.
+- `agenda_item_id` e unico: cada pauta pode ter no maximo uma votacao.
 - Para iniciar a votacao, a reuniao precisa estar `in_progress`.
 - Para iniciar a votacao, a votacao precisa estar `waiting`.
+- Ao iniciar, um job assincrono (`CloseExpiredVoteJob`, `ActiveJob` com adapter `:async`) e agendado para
+  encerrar a votacao automaticamente quando `closes_at` e atingido.
 
 ## Tabela `vote_options`
 
@@ -339,6 +368,8 @@ Armazena os votos registrados pelos usuarios.
 | `user_id` | `bigint` | Sim | - | Usuario votante. |
 | `weight` | `decimal(10,2)` | Sim | - | Peso do voto no momento do registro. |
 | `cast_at` | `datetime` | Sim | - | Data e hora do voto. |
+| `ip_address` | `string` | Nao | - | IP de origem do voto (auditoria). |
+| `user_agent` | `string` | Nao | - | Navegador/dispositivo de origem do voto (auditoria). |
 | `created_at` | `datetime` | Sim | auto | Data de criacao. |
 | `updated_at` | `datetime` | Sim | auto | Data da ultima atualizacao. |
 

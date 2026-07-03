@@ -1,8 +1,12 @@
 module Api
   module V1
-    class UsersController < ApplicationController
+    class UsersController < BaseController
       before_action :set_condominium, only: %i[index create]
       before_action :set_user, only: %i[show update destroy]
+      before_action -> { authorize_roles!("administrator") }, only: %i[index create update destroy]
+      before_action -> { authorize_condominium_scope!(@condominium) }, only: %i[index create]
+      before_action -> { authorize_condominium_scope!(@user.condominium) }, only: %i[update destroy]
+      before_action :authorize_show!, only: :show
 
       def index
         users = @condominium.users.order(created_at: :desc)
@@ -18,7 +22,15 @@ module Api
       end
 
       def create
-        render_created @condominium.users.create!(user_params)
+        user = @condominium.users.new(user_params)
+        initial_credential = assign_initial_credential(user)
+        user.save!
+
+        payload = user.as_json
+        payload[:initial_password] = initial_credential if user.administrator? || user.owner?
+        payload[:access_token] = user.access_token if user.guest? || user.proxy?
+
+        render json: payload, status: :created
       end
 
       def update
@@ -41,6 +53,12 @@ module Api
         @user = User.find(params[:id])
       end
 
+      def authorize_show!
+        return if current_user.administrator? || current_user.id == @user.id
+
+        render json: { error: "acesso negado para este perfil" }, status: :forbidden
+      end
+
       def user_params
         params.require(:user).permit(
           :name,
@@ -53,6 +71,16 @@ module Api
           :proxy_for_id,
           :meeting_id
         )
+      end
+
+      # Gera senha inicial (administrator/owner) ou access_token (guest/proxy, feito pelo model).
+      # TODO(Fase 4): enviar essa credencial por e-mail em vez de devolve-la na resposta.
+      def assign_initial_credential(user)
+        return nil unless user.administrator? || user.owner?
+
+        password = SecureRandom.hex(6)
+        user.password = password
+        password
       end
     end
   end

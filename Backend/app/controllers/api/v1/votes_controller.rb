@@ -1,8 +1,11 @@
 module Api
   module V1
-    class VotesController < ApplicationController
+    class VotesController < BaseController
       before_action :set_meeting, only: %i[index create]
       before_action :set_vote, only: %i[show update destroy start finish result]
+      before_action -> { authorize_meeting_scope!(@meeting) }, only: %i[index create]
+      before_action -> { authorize_meeting_scope!(@vote.meeting) }, only: %i[show update destroy start finish result]
+      before_action -> { authorize_roles!("administrator") }, only: %i[create update destroy start finish]
 
       def index
         votes = @meeting.votes.includes(:agenda_item, :vote_options).order(:created_at)

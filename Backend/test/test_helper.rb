@@ -4,6 +4,8 @@ require_relative "../config/environment"
 require "rails/test_help"
 
 class ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   parallelize(workers: 1)
   self.use_transactional_tests = true
 end
@@ -21,6 +23,14 @@ class ActionDispatch::IntegrationTest
 
   def json_payload(payload)
     payload.to_json
+  end
+
+  def auth_headers(user)
+    jti = SecureRandom.uuid
+    user.update!(active_session_token: jti) if user.guest? || user.proxy?
+    token = JwtService.encode({ user_id: user.id }, jti:)
+
+    json_headers.merge("Authorization" => "Bearer #{token}")
   end
 end
 

@@ -1,8 +1,11 @@
 module Api
   module V1
-    class VoteOptionsController < ApplicationController
+    class VoteOptionsController < BaseController
       before_action :set_vote, only: %i[index create]
       before_action :set_vote_option, only: %i[show update destroy]
+      before_action -> { authorize_meeting_scope!(@vote.meeting) }, only: %i[index create]
+      before_action -> { authorize_meeting_scope!(@vote_option.vote.meeting) }, only: %i[show update destroy]
+      before_action -> { authorize_roles!("administrator") }, only: %i[create update destroy]
 
       def index
         render json: @vote.vote_options.order(:position)

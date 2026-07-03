@@ -23,6 +23,7 @@ class Vote < ApplicationRecord
 
   validates :statement, :response_type, :visibility, :status, presence: true
   validates :duration_minutes, numericality: { only_integer: true, greater_than: 0 }
+  validates :agenda_item_id, uniqueness: { message: "ja possui uma votacao cadastrada" }
   validate :agenda_item_must_belong_to_meeting
 
   def start!
@@ -34,6 +35,8 @@ class Vote < ApplicationRecord
       create_default_options! if yes_no_abstain? && vote_options.empty?
       update!(status: :active, started_at: Time.current, closes_at: duration_minutes.minutes.from_now)
     end
+
+    CloseExpiredVoteJob.set(wait_until: closes_at).perform_later(id)
   end
 
   def finish!

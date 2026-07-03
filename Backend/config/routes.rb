@@ -3,6 +3,11 @@ Rails.application.routes.draw do
 
   namespace :api do
     namespace :v1 do
+      resource :sessions, only: %i[create destroy]
+      resources :meeting_accesses, only: :create
+      resources :password_resets, only: :create
+      patch "password_resets/:token", to: "password_resets#update", as: :password_reset_token
+
       resources :condominiums do
         resources :meetings, shallow: true do
           member do
