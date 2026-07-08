@@ -110,6 +110,36 @@ Para popular o banco com dados de exemplo:
 docker compose run --rm backend bin/rails db:seed
 ```
 
+O seed (`Backend/db/seeds.rb`) e idempotente (pode ser rodado varias vezes) e cria dois condominios com
+usuarios de todos os papeis, reunioes em todos os tipos/status, votacoes de todos os tipos/visibilidades,
+pauta com PDF anexado, presenca e log de acesso, para exercitar todas as funcionalidades do sistema:
+
+| Condominio | Usuario | Papel | Login |
+| --- | --- | --- | --- |
+| Residencial Jardim das Palmeiras | Joao Silva | Administrador | `joao.silva@email.com` / `condominio123` |
+| Residencial Jardim das Palmeiras | Maria Oliveira | Proprietario (adimplente) | `maria.oliveira@email.com` / `condominio123` |
+| Residencial Jardim das Palmeiras | Carlos Souza | Proprietario (adimplente) | `carlos.souza@email.com` / `condominio123` |
+| Residencial Jardim das Palmeiras | Roberto Lima | Proprietario (inadimplente) | `roberto.lima@email.com` / `condominio123` |
+| Residencial Jardim das Palmeiras | Erling Haaland | Convidado | acesso por token (impresso ao final do seed) |
+| Residencial Jardim das Palmeiras | Alexandre Ribas | Procurador (representa Maria) | acesso por token (impresso ao final do seed) |
+| Edificio Bela Vista | Ana Pereira | Administrador | `ana.pereira@email.com` / `condominio123` |
+| Edificio Bela Vista | Bruno Santos | Proprietario | `bruno.santos@email.com` / `condominio123` |
+
+Convidado e Procurador nao tem senha: o comando de seed imprime no terminal o link
+`http://localhost:5173/acesso/<token>` de cada um (o token e gerado aleatoriamente a cada banco novo).
+
+Reunioes criadas no condominio principal, cobrindo cada combinacao de tipo/status:
+
+- **Agendada** (`with_owners`): "Assembleia Extraordinaria - Manutencao do Elevador" — testar o fluxo "Iniciar".
+- **Em andamento** (`with_owners`): "Assembleia Geral Ordinaria - Mai/2026" — uma votacao aberta ja com votos
+  parciais, uma votacao secreta aguardando inicio e uma pauta sem votacao.
+- **Finalizada** (`with_owners`): "Assembleia Geral Ordinaria - Fev/2026" — pauta com PDF anexado, duas votacoes
+  encerradas com resultado, log de acesso e relatorio gerencial/exportacoes disponiveis.
+- **Cancelada** (`with_owners`): "Assembleia Extraordinaria - Reforma da Piscina".
+- **Restrita a administradores** (`administrators_only`): "Reuniao Interna da Administracao".
+- **Com convidados** (`with_guests`, em andamento): "Reuniao Aberta - Apresentacao da Reforma da Fachada" — testar
+  o acesso por token do Convidado/Procurador e votar ao vivo.
+
 Para ver as rotas da API:
 
 ```bash
