@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { cancelMeeting, finishMeeting, getMeeting, joinMeeting } from '../api/meetings'
 import { useAuth } from '../context/useAuth'
-import { Button, Card, ErrorBanner, LoadingState, PageHeader } from '../components/ui'
+import { Button, Card, ConfirmDialog, ErrorBanner, LoadingState, PageHeader } from '../components/ui'
 import { meetingStatusLabels, meetingTypeLabels, formatDateTime, voteStatusLabels } from '../utils/labels'
 import { ApiError } from '../api/client'
 
@@ -14,6 +15,7 @@ export function Detalhes() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const [pendingAction, setPendingAction] = useState<'finish' | 'cancel' | null>(null)
 
   const { data: meeting, isLoading, error } = useQuery({
     queryKey: ['meeting', meetingId],
@@ -27,12 +29,18 @@ export function Detalhes() {
 
   const finishMutation = useMutation({
     mutationFn: () => finishMeeting(meetingId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['meeting', meetingId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['meeting', meetingId] })
+      setPendingAction(null)
+    },
   })
 
   const cancelMutation = useMutation({
     mutationFn: () => cancelMeeting(meetingId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['meeting', meetingId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['meeting', meetingId] })
+      setPendingAction(null)
+    },
   })
 
   const isAdmin = user?.role === 'administrator'
@@ -71,12 +79,12 @@ export function Detalhes() {
               </Button>
             )}
             {isAdmin && meeting.status === 'in_progress' && (
-              <Button onClick={() => finishMutation.mutate()} disabled={finishMutation.isPending}>
+              <Button onClick={() => setPendingAction('finish')} disabled={finishMutation.isPending}>
                 Finalizar reuniao
               </Button>
             )}
             {isAdmin && meeting.status === 'scheduled' && (
-              <Button variant="danger" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>
+              <Button variant="danger" onClick={() => setPendingAction('cancel')} disabled={cancelMutation.isPending}>
                 Cancelar reuniao
               </Button>
             )}
@@ -131,6 +139,25 @@ export function Detalhes() {
           </div>
         </Card>
       </div>
+      <ConfirmDialog
+        open={pendingAction === 'finish'}
+        title="Finalizar reuniao"
+        message="Tem certeza que deseja finalizar esta reuniao? Nao sera possivel reabri-la depois."
+        confirmLabel="Finalizar"
+        isLoading={finishMutation.isPending}
+        onConfirm={() => finishMutation.mutate()}
+        onCancel={() => setPendingAction(null)}
+      />
+      <ConfirmDialog
+        open={pendingAction === 'cancel'}
+        title="Cancelar reuniao"
+        message="Tem certeza que deseja cancelar esta reuniao? Esta acao nao pode ser desfeita."
+        confirmLabel="Cancelar reuniao"
+        variant="danger"
+        isLoading={cancelMutation.isPending}
+        onConfirm={() => cancelMutation.mutate()}
+        onCancel={() => setPendingAction(null)}
+      />
     </>
   )
 }

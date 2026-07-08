@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { createVote, deleteVote, finishVote, getVote, startVote, updateVote } from '../api/votes'
 import { listAgendaItems } from '../api/agendaItems'
 import { getMeeting } from '../api/meetings'
-import { Button, Card, ErrorBanner, Field, Input, PageHeader, Select, Table } from '../components/ui'
+import { Button, Card, ConfirmDialog, ErrorBanner, Field, Input, PageHeader, Select, Table } from '../components/ui'
 import { responseTypeLabels, visibilityLabels, voteStatusLabels } from '../utils/labels'
 import { ApiError } from '../api/client'
 import type { ResponseType, Visibility } from '../api/types'
@@ -41,6 +41,7 @@ export function VotacaoForm() {
   const [options, setOptions] = useState<string[]>([])
   const [newOption, setNewOption] = useState('')
   const [syncedVoteId, setSyncedVoteId] = useState<number | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   if (existingVote && existingVote.id !== syncedVoteId) {
     setSyncedVoteId(existingVote.id)
@@ -210,7 +211,7 @@ export function VotacaoForm() {
               </Button>
             )}
             {!isCreating && isWaiting && (
-              <Button variant="danger" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
+              <Button variant="danger" onClick={() => setConfirmDelete(true)} disabled={deleteMutation.isPending}>
                 Excluir
               </Button>
             )}
@@ -230,6 +231,16 @@ export function VotacaoForm() {
           </div>
         </form>
       </Card>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Excluir votacao"
+        message="Tem certeza que deseja excluir esta votacao? Esta acao nao pode ser desfeita."
+        confirmLabel="Excluir"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => deleteMutation.mutate()}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </>
   )
 }

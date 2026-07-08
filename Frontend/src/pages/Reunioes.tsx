@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { listMeetings, startMeeting } from '../api/meetings'
 import { useAuth } from '../context/useAuth'
-import { Button, Card, ErrorBanner, Field, Input, LoadingState, PageHeader, Select, StatusBadge, Table } from '../components/ui'
+import { Button, Card, ConfirmDialog, ErrorBanner, Field, Input, LoadingState, PageHeader, Select, StatusBadge, Table } from '../components/ui'
 import { meetingStatusLabels, meetingTypeLabels, formatDateTime } from '../utils/labels'
 import { ApiError } from '../api/client'
 import type { MeetingStatus, MeetingType } from '../api/types'
@@ -18,6 +18,7 @@ export function Reunioes() {
   const [title, setTitle] = useState('')
   const [meetingType, setMeetingType] = useState<MeetingType | ''>('')
   const [status, setStatus] = useState<MeetingStatus | ''>('')
+  const [meetingToStart, setMeetingToStart] = useState<{ id: number; title: string } | null>(null)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['meetings', condId, title, meetingType, status],
@@ -32,7 +33,10 @@ export function Reunioes() {
 
   const startMutation = useMutation({
     mutationFn: startMeeting,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['meetings', condId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['meetings', condId] })
+      setMeetingToStart(null)
+    },
   })
 
   const isAdmin = user?.role === 'administrator'
@@ -99,7 +103,7 @@ export function Reunioes() {
                   Detalhes
                 </Button>
                 {isAdmin && meeting.status === 'scheduled' && (
-                  <Button onClick={() => startMutation.mutate(meeting.id)}>Iniciar</Button>
+                  <Button onClick={() => setMeetingToStart({ id: meeting.id, title: meeting.title })}>Iniciar</Button>
                 )}
                 {isAdmin && meeting.status === 'scheduled' && (
                   <Button variant="secondary" onClick={() => navigate(`/reunioes/${meeting.id}/procurador`)}>
@@ -119,6 +123,15 @@ export function Reunioes() {
           />
         )}
       </Card>
+      <ConfirmDialog
+        open={meetingToStart !== null}
+        title="Iniciar reuniao"
+        message={`Tem certeza que deseja iniciar a reuniao "${meetingToStart?.title ?? ''}"? Os participantes poderao entrar assim que ela for iniciada.`}
+        confirmLabel="Iniciar"
+        isLoading={startMutation.isPending}
+        onConfirm={() => startMutation.mutate(meetingToStart!.id)}
+        onCancel={() => setMeetingToStart(null)}
+      />
     </>
   )
 }
