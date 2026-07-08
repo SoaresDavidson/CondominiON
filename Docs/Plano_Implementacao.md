@@ -6,27 +6,27 @@ Cada item referencia o requisito/caso de uso do ERS quando aplicável (RF = Requ
 
 ## Status atual
 
-**Fases 0, 1, 2, 4 e 6 implementadas e verificadas** (suíte de testes do backend — 30 testes — verde; `npm run build`/`lint` do frontend limpos; fluxo login → condomínios → reuniões → detalhes → pautas → votação testado manualmente no browser; envio de e-mail testado manualmente via `letter_opener_web`). Pendências conhecidas:
+**Fases 0, 1, 2, 4 e 6 implementadas e verificadas** (suíte de testes do backend — 30 testes — verde; `npm run build`/`lint` do frontend limpos em verificação anterior; fluxo login → condomínios → reuniões → detalhes → pautas → votação testado manualmente no browser; envio de e-mail testado manualmente via `letter_opener_web`). Pendências conhecidas:
 
 - Limitação de schema já conhecida e não resolvida nesta rodada: `users.condominium_id` é 1:N (um usuário pertence a um único condomínio), o que não cobre literalmente RF7 ("usuários podem pertencer a diversos condomínios"). Resolver exigiria uma tabela `users_condominiums` — fora de escopo por ora.
 
-Fases 3, 5, 8, 9 (parcial), 11 e 12 (parcial) estão em andamento nesta rodada por não dependerem de credenciais externas.
-Fases 7 (videoconferência), 9 (transcrição) e 10 (ata por LLM) continuam pendentes por dependerem de credenciais/contas de serviços externos (Zoom/Meet/Teams, Whisper, Anthropic/OpenAI) que não foram fornecidas — ver notas em cada fase.
+Fases 3, 5, 8, 9, 10, 11 e 12 continuam pendentes ou parcialmente preparadas. As dependências de parsing/relatórios (`roo`, `csv`, `caxlsx`, `prawn`) e a base do `ActiveStorage` já existem no projeto, mas ainda não há fluxo funcional completo para convites em massa, upload real de anexos, auditoria de acessos, chat/transcrição, ata por LLM ou relatórios/exportações.
+Fases 7 (videoconferência), 9 (transcrição) e 10 (ata por LLM) também dependem de credenciais/contas de serviços externos (Zoom/Meet/Teams, Whisper, Anthropic/OpenAI) que não foram fornecidas — ver notas em cada fase.
 
 ---
 
-## Fase 0 — Autenticação e Autorização (bloqueador de tudo) ✅ Concluída (envio de e-mail fica para a Fase 4)
+## Fase 0 — Autenticação e Autorização (bloqueador de tudo) ✅ Concluída
 
 Hoje não existe login, sessão nem controle de acesso — qualquer endpoint pode ser chamado por qualquer um. Isso é pré-requisito para praticamente todos os fluxos do ERS (RNF4).
 
 - [x] Adicionar gem de autenticação (`bcrypt` + `jwt`, solução própria — sem Devise). Ver [Gemfile](../Backend/Gemfile), [jwt_service.rb](../Backend/app/services/jwt_service.rb).
 - [x] Login para Administrador/Proprietário (sessão permanente). Ver [sessions_controller.rb](../Backend/app/controllers/api/v1/sessions_controller.rb).
 - [x] Acesso único vinculado a uma reunião para Convidado/Procurador (token de uso único trocado por JWT escopado). Ver [meeting_accesses_controller.rb](../Backend/app/controllers/api/v1/meeting_accesses_controller.rb).
-- [x] Tela e fluxo de "Esqueci minha senha" (3.4.2.4): endpoint de solicitação, geração de link temporário e endpoint de redefinição implementados ([password_resets_controller.rb](../Backend/app/controllers/api/v1/password_resets_controller.rb), páginas `ForgotPassword`/`ResetPassword`). **Envio por e-mail ainda não existe** — resposta genérica já segue o texto do ERS, mas o token só é exposto em ambiente non-production até a Fase 4.
+- [x] Tela e fluxo de "Esqueci minha senha" (3.4.2.4): endpoint de solicitação, geração de link temporário e endpoint de redefinição implementados ([password_resets_controller.rb](../Backend/app/controllers/api/v1/password_resets_controller.rb), páginas `ForgotPassword`/`ResetPassword`) e envio por e-mail concluído na Fase 4. A resposta genérica segue o texto do ERS, e o token só é exposto em ambiente non-production para facilitar testes manuais.
 - [x] Middleware/`before_action` de autorização por `role` em todos os controllers. Ver [authenticatable.rb](../Backend/app/controllers/concerns/authenticatable.rb) e `Api::V1::BaseController`.
 - [x] Regra: tipo do usuário deve ser compatível com o tipo da reunião para poder entrar (RF3, UC2, fluxo "Entrar na Reunião"). Ver `MeetingsController#role_allowed_for_meeting?`.
 - [x] Bloquear login duplicado do mesmo usuário/procurador em duas sessões simultâneas na mesma reunião (rotação de `active_session_token`/`jti` a cada novo login de convidado/procurador).
-- [x] Geração de senha inicial aleatória (Administrador/Proprietário) e `access_token` (Convidado/Procurador) no cadastro de usuário. **Envio por e-mail ainda não existe** — credencial é devolvida na resposta da API (`initial_password`/`access_token`) até a Fase 4.
+- [x] Geração de senha inicial aleatória (Administrador/Proprietário) e `access_token` (Convidado/Procurador) no cadastro de usuário, com envio por e-mail concluído na Fase 4. Em produção, a API não expõe `initial_password`/`access_token`; fora de produção, mantém esses campos para facilitar testes manuais.
 
 ---
 
@@ -67,7 +67,7 @@ Mesmo dentro do subconjunto já coberto por `Contrato_API.md`, várias regras do
 Endpoint atual (`POST /meetings/:id/send_invitations`) só recebe `total_recipients` e devolve `202 queued` — não processa arquivo nem envia nada.
 
 - [ ] Adicionar upload real de arquivo (`multipart/form-data`) para planilha `.csv`/`.xlsx`.
-- [ ] Adicionar gem de parsing (`roo` ou `caxlsx`/`csv` nativo para `.csv`).
+- [x] Adicionar gem de parsing (`roo` ou `caxlsx`/`csv` nativo para `.csv`). Dependências `roo` e `csv` já estão no [Gemfile](../Backend/Gemfile); o uso no endpoint ainda falta nos itens abaixo.
 - [ ] Validar colunas obrigatórias (Nome, E-Mail, Unidades, Peso Total) e formato de cada linha; retornar erro detalhando a linha com problema.
 - [ ] Criar automaticamente os usuários que não existem e vinculá-los à reunião.
 - [ ] Disparar e-mail para cada usuário da lista (ver Fase 4) com link da reunião, credenciais provisórias e edital de convocação.
@@ -95,8 +95,8 @@ Endpoint atual (`POST /meetings/:id/send_invitations`) só recebe `total_recipie
   [password_resets_controller.rb](../Backend/app/controllers/api/v1/password_resets_controller.rb).
 - [x] Resposta da API deixa de expor `initial_password`/`access_token`/`reset_token` em produção
   (`unless Rails.env.production?`), já que agora são entregues por e-mail.
-- Testes: `test/mailers/user_mailer_test.rb` (conteúdo/assunto de cada e-mail) e asserções
-  `assert_enqueued_emails`/`assert_enqueued_email_with` nos testes de integração de usuários e password reset.
+- [x] Testes: `test/mailers/user_mailer_test.rb` (conteúdo/assunto de cada e-mail) e asserções
+  `assert_enqueued_emails` nos testes de integração de usuários e password reset.
 
 ---
 
@@ -104,7 +104,7 @@ Endpoint atual (`POST /meetings/:id/send_invitations`) só recebe `total_recipie
 
 Hoje `attachment_url` é só uma `string` livre — não há upload de arquivo nem validação de tipo.
 
-- [ ] Adicionar `ActiveStorage` (ou S3/Carrierwave) para upload real de arquivo.
+- [x] Adicionar base do `ActiveStorage` (ou S3/Carrierwave). As tabelas/configuração do ActiveStorage já existem; o upload real de arquivo no fluxo de pauta ainda falta nos itens abaixo.
 - [ ] Validar que o anexo é PDF (tipo de conteúdo e/ou extensão).
 - [ ] Servir o download do anexo por link direto para participantes da reunião.
 - [ ] Atualizar `Contrato_API.md` e `Tabelas_Banco_de_Dados.md` para refletir o novo mecanismo de upload.
@@ -164,8 +164,8 @@ Nenhuma integração de vídeo existe hoje.
 ## Fase 11 — Relatório Gerencial Consolidado (RF4, UC6, 3.4.6)
 
 - [ ] Endpoint que compila: estatísticas de presença (total de unidades, presentes, % quórum, presentes por procuração), deliberações por pauta (total de votos, resultado, vencedor/% dos votos).
-- [ ] Gem de geração de PDF (`prawn`, `wicked_pdf`, ou similar) para o layout do relatório consolidado.
-- [ ] Exportação de Resultado de Votação em PDF e Excel (tela de Resultado, 3.4.3.2) — gem adicional para Excel (`caxlsx`).
+- [x] Gem de geração de PDF (`prawn`, `wicked_pdf`, ou similar) adicionada (`prawn`/`prawn-table`). O endpoint/layout do relatório consolidado ainda falta nos demais itens.
+- [ ] Exportação de Resultado de Votação em PDF e Excel (tela de Resultado, 3.4.3.2) — dependência de Excel (`caxlsx`) já adicionada, mas a exportação funcional ainda não foi implementada.
 - [ ] Disponibilizar todos esses documentos apenas após a reunião estar "Finalizada", com mensagem de espera se ainda não gerados (fluxo "Detalhes da Reunião").
 
 ---
@@ -174,8 +174,8 @@ Nenhuma integração de vídeo existe hoje.
 
 - [ ] **RNF3 — Desempenho**: testes de carga simulando 1000 usuários simultâneos votando (ex. k6, Locust) contra os endpoints de `ballots` e `votes`; validar índices e possível necessidade de connection pooling/cache.
 - [ ] **RNF1 — Usabilidade mobile/idosos**: revisar frontend responsivo, tamanhos de fonte/toque, contraste, testes em dispositivos móveis reais.
-- [ ] **RNF2 — Banco gratuito**: já atendido (PostgreSQL). Sem ação.
-- [ ] Cobertura de testes automatizados para os novos fluxos (auth, e-mail, upload, jobs assíncronos) — hoje só há testes de integração de CRUD (`test/integration/api_v1_requests_test.rb`).
+- [x] **RNF2 — Banco gratuito**: já atendido (PostgreSQL). Sem ação.
+- [ ] Cobertura de testes automatizados para os novos fluxos (upload, exportações, chat/transcrição, auditoria e jobs assíncronos persistentes) — auth, e-mail e CRUD principal já têm cobertura automatizada inicial.
 
 ---
 
