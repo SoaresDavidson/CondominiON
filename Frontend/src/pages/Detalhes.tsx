@@ -1,13 +1,19 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { cancelMeeting, finishMeeting, getMeeting, joinMeeting } from '../api/meetings'
+import {
+  cancelMeeting,
+  downloadAccessLog,
+  downloadManagerialReport,
+  finishMeeting,
+  getMeeting,
+  joinMeeting,
+  leaveMeeting,
+} from '../api/meetings'
 import { useAuth } from '../context/useAuth'
 import { Button, Card, ConfirmDialog, ErrorBanner, LoadingState, PageHeader } from '../components/ui'
 import { meetingStatusLabels, meetingTypeLabels, formatDateTime, voteStatusLabels } from '../utils/labels'
 import { ApiError } from '../api/client'
-
-const REPORT_BUTTONS = ['Gerar Ata', 'Baixar Gravacao', 'Baixar Chat', 'Gerar Log', 'Gerar Transcricao']
 
 export function Detalhes() {
   const { id } = useParams<{ id: string }>()
@@ -27,6 +33,10 @@ export function Detalhes() {
     mutationFn: () => joinMeeting(meetingId, user!.id),
   })
 
+  const leaveMutation = useMutation({
+    mutationFn: () => leaveMeeting(meetingId, user!.id),
+  })
+
   const finishMutation = useMutation({
     mutationFn: () => finishMeeting(meetingId),
     onSuccess: () => {
@@ -43,8 +53,17 @@ export function Detalhes() {
     },
   })
 
+  const accessLogMutation = useMutation({ mutationFn: () => downloadAccessLog(meetingId) })
+  const managerialReportMutation = useMutation({ mutationFn: () => downloadManagerialReport(meetingId) })
+
   const isAdmin = user?.role === 'administrator'
-  const mutationError = joinMutation.error ?? finishMutation.error ?? cancelMutation.error
+  const mutationError =
+    joinMutation.error ??
+    leaveMutation.error ??
+    finishMutation.error ??
+    cancelMutation.error ??
+    accessLogMutation.error ??
+    managerialReportMutation.error
 
   if (isLoading) return <LoadingState />
   if (error instanceof ApiError) return <ErrorBanner message={error.message} />
@@ -78,6 +97,11 @@ export function Detalhes() {
                 Entrar na reuniao
               </Button>
             )}
+            {meeting.status === 'in_progress' && !isAdmin && (
+              <Button variant="secondary" onClick={() => leaveMutation.mutate()} disabled={leaveMutation.isPending}>
+                Registrar saida
+              </Button>
+            )}
             {isAdmin && meeting.status === 'in_progress' && (
               <Button onClick={() => setPendingAction('finish')} disabled={finishMutation.isPending}>
                 Finalizar reuniao
@@ -99,14 +123,28 @@ export function Detalhes() {
             <div className="mt-4">
               <p className="mb-2 text-xs font-bold uppercase text-slate-500">Documentos da reuniao</p>
               <div className="flex flex-wrap gap-2">
-                {REPORT_BUTTONS.map((label) => (
+                {isAdmin && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => managerialReportMutation.mutate()}
+                    disabled={managerialReportMutation.isPending}
+                  >
+                    Relatorio gerencial
+                  </Button>
+                )}
+                {isAdmin && (
+                  <Button variant="secondary" onClick={() => accessLogMutation.mutate()} disabled={accessLogMutation.isPending}>
+                    Gerar Log
+                  </Button>
+                )}
+                {['Gerar Ata', 'Baixar Gravacao', 'Baixar Chat', 'Gerar Transcricao'].map((label) => (
                   <Button key={label} variant="secondary" disabled>
                     {label}
                   </Button>
                 ))}
               </div>
               <p className="mt-2 text-xs text-slate-500">
-                Geracao de ata, gravacao, chat, log e transcricao ainda nao esta disponivel nesta versao.
+                Ata, gravacao, chat e transcricao dependem de integracoes externas ou tempo real e ainda nao estao disponiveis.
               </p>
             </div>
           )}

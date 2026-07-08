@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getVoteResult } from '../api/votes'
+import { downloadVoteResultPdf, downloadVoteResultXlsx, getVoteResult } from '../api/votes'
 import { Button, Card, ErrorBanner, LoadingState, PageHeader, Table } from '../components/ui'
 import { formatDateTime, visibilityLabels, voteStatusLabels } from '../utils/labels'
 import { ApiError } from '../api/client'
@@ -15,6 +15,8 @@ export function Resultado() {
     queryFn: () => getVoteResult(voteId),
     enabled: Number.isFinite(voteId),
   })
+  const pdfMutation = useMutation({ mutationFn: () => downloadVoteResultPdf(voteId) })
+  const xlsxMutation = useMutation({ mutationFn: () => downloadVoteResultXlsx(voteId) })
 
   if (isLoading) return <LoadingState />
   if (error instanceof ApiError) return <ErrorBanner message={error.message} />
@@ -27,6 +29,15 @@ export function Resultado() {
   return (
     <>
       <PageHeader eyebrow="Apuracao" title="Resultado da votacao" />
+      <ErrorBanner
+        message={
+          pdfMutation.error instanceof ApiError
+            ? pdfMutation.error.message
+            : xlsxMutation.error instanceof ApiError
+              ? xlsxMutation.error.message
+              : null
+        }
+      />
       <Card>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
@@ -63,6 +74,14 @@ export function Resultado() {
         </Card>
       )}
       <div className="mt-4">
+        <div className="mb-3 flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => pdfMutation.mutate()} disabled={pdfMutation.isPending}>
+            Exportar PDF
+          </Button>
+          <Button variant="secondary" onClick={() => xlsxMutation.mutate()} disabled={xlsxMutation.isPending}>
+            Exportar Excel
+          </Button>
+        </div>
         <Button variant="secondary" onClick={() => navigate(`/reunioes/${vote.meeting_id}/votacoes`)}>
           Voltar para votacoes
         </Button>

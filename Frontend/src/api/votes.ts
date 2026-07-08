@@ -1,4 +1,4 @@
-import { apiFetch } from './client'
+import { apiDownload, apiFetch } from './client'
 import type { ResponseType, Visibility, Vote, VoteResult, VoteStatus } from './types'
 
 export function listVotes(
@@ -45,4 +45,12 @@ export function finishVote(id: number) {
 
 export function getVoteResult(id: number) {
   return apiFetch<VoteResult>(`/votes/${id}/result`)
+}
+
+export function downloadVoteResultPdf(id: number) {
+  return apiDownload(`/votes/${id}/export_pdf`, `resultado-votacao-${id}.pdf`)
+}
+
+export function downloadVoteResultXlsx(id: number) {
+  return apiDownload(`/votes/${id}/export_xlsx`, `resultado-votacao-${id}.xlsx`)
 }

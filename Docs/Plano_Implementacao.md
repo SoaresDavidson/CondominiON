@@ -6,11 +6,11 @@ Cada item referencia o requisito/caso de uso do ERS quando aplicável (RF = Requ
 
 ## Status atual
 
-**Fases 0, 1, 2, 4 e 6 implementadas e verificadas** (suíte de testes do backend — 30 testes — verde; `npm run build`/`lint` do frontend limpos em verificação anterior; fluxo login → condomínios → reuniões → detalhes → pautas → votação testado manualmente no browser; envio de e-mail testado manualmente via `letter_opener_web`). Pendências conhecidas:
+**Fases 0, 1, 2, 4, 5, 6, 8 e 11 implementadas e verificadas** (suíte de testes do backend — 32 testes — verde; `npm run build`/`lint` do frontend limpos; fluxo login → condomínios → reuniões → detalhes → pautas → votação testado manualmente no browser; envio de e-mail testado manualmente via `letter_opener_web`). Pendências conhecidas:
 
 - Limitação de schema já conhecida e não resolvida nesta rodada: `users.condominium_id` é 1:N (um usuário pertence a um único condomínio), o que não cobre literalmente RF7 ("usuários podem pertencer a diversos condomínios"). Resolver exigiria uma tabela `users_condominiums` — fora de escopo por ora.
 
-Fases 3, 5, 8, 9, 10, 11 e 12 continuam pendentes ou parcialmente preparadas. As dependências de parsing/relatórios (`roo`, `csv`, `caxlsx`, `prawn`) e a base do `ActiveStorage` já existem no projeto, mas ainda não há fluxo funcional completo para convites em massa, upload real de anexos, auditoria de acessos, chat/transcrição, ata por LLM ou relatórios/exportações.
+Fases 3, 7, 9, 10 e 12 continuam pendentes ou parcialmente preparadas. As dependências de parsing/relatórios (`roo`, `csv`, `caxlsx`, `prawn`) e a base do `ActiveStorage` já existem no projeto, mas ainda não há fluxo funcional completo para convites em massa, videoconferência, chat/transcrição, ata por LLM ou testes não-funcionais formais.
 Fases 7 (videoconferência), 9 (transcrição) e 10 (ata por LLM) também dependem de credenciais/contas de serviços externos (Zoom/Meet/Teams, Whisper, Anthropic/OpenAI) que não foram fornecidas — ver notas em cada fase.
 
 ---
@@ -100,14 +100,15 @@ Endpoint atual (`POST /meetings/:id/send_invitations`) só recebe `total_recipie
 
 ---
 
-## Fase 5 — Anexos de Pauta (upload real de PDF) (RF8, UC5)
+## Fase 5 — Anexos de Pauta (upload real de PDF) (RF8, UC5) ✅ Concluída
 
-Hoje `attachment_url` é só uma `string` livre — não há upload de arquivo nem validação de tipo.
+`attachment_url` foi mantido como campo legado, mas o fluxo real usa `ActiveStorage` com upload multipart e
+download autenticado.
 
-- [x] Adicionar base do `ActiveStorage` (ou S3/Carrierwave). As tabelas/configuração do ActiveStorage já existem; o upload real de arquivo no fluxo de pauta ainda falta nos itens abaixo.
-- [ ] Validar que o anexo é PDF (tipo de conteúdo e/ou extensão).
-- [ ] Servir o download do anexo por link direto para participantes da reunião.
-- [ ] Atualizar `Contrato_API.md` e `Tabelas_Banco_de_Dados.md` para refletir o novo mecanismo de upload.
+- [x] Adicionar base do `ActiveStorage` (ou S3/Carrierwave). As tabelas/configuração do ActiveStorage já existem e o fluxo de pauta usa `has_one_attached :attachment`.
+- [x] Validar que o anexo é PDF (tipo de conteúdo e/ou extensão). Ver [agenda_item.rb](../Backend/app/models/agenda_item.rb).
+- [x] Servir o download do anexo por link autenticado para participantes da reunião. Ver `GET /api/v1/agenda_items/:id/attachment`.
+- [x] Atualizar `Contrato_API.md` e `Tabelas_Banco_de_Dados.md` para refletir o novo mecanismo de upload.
 
 ---
 
@@ -134,11 +135,11 @@ Nenhuma integração de vídeo existe hoje.
 
 ---
 
-## Fase 8 — Log de Auditoria de Acessos (RF4, 3.4.1.8)
+## Fase 8 — Log de Auditoria de Acessos (RF4, 3.4.1.8) ✅ Concluída
 
-- [ ] Nova tabela (ex. `access_logs`) com `user_id`, `ip`, `user_agent`, `meeting_id`, `event` (entrada/saída), `timestamp`.
-- [ ] Registrar entrada/saída da reunião (hoje só `joined_at`/`left_at` em `meeting_users`, sem IP/browser).
-- [ ] Endpoint/ação `Gerar Log da Reunião` retornando HTML formatado para download (conforme protótipo 3.4.1.8).
+- [x] Nova tabela `access_logs` com `user_id`, `ip_address`, `user_agent`, `meeting_id`, `event` (entrada/saída), `occurred_at`.
+- [x] Registrar entrada/saída da reunião (`join`/`leave`) com IP/browser, mantendo `meeting_users` como estado de presença.
+- [x] Endpoint/ação `Gerar Log da Reunião` retornando HTML formatado para download (conforme protótipo 3.4.1.8).
 
 ---
 
@@ -161,12 +162,12 @@ Nenhuma integração de vídeo existe hoje.
 
 ---
 
-## Fase 11 — Relatório Gerencial Consolidado (RF4, UC6, 3.4.6)
+## Fase 11 — Relatório Gerencial Consolidado (RF4, UC6, 3.4.6) ✅ Concluída
 
-- [ ] Endpoint que compila: estatísticas de presença (total de unidades, presentes, % quórum, presentes por procuração), deliberações por pauta (total de votos, resultado, vencedor/% dos votos).
-- [x] Gem de geração de PDF (`prawn`, `wicked_pdf`, ou similar) adicionada (`prawn`/`prawn-table`). O endpoint/layout do relatório consolidado ainda falta nos demais itens.
-- [ ] Exportação de Resultado de Votação em PDF e Excel (tela de Resultado, 3.4.3.2) — dependência de Excel (`caxlsx`) já adicionada, mas a exportação funcional ainda não foi implementada.
-- [ ] Disponibilizar todos esses documentos apenas após a reunião estar "Finalizada", com mensagem de espera se ainda não gerados (fluxo "Detalhes da Reunião").
+- [x] Endpoint que compila: estatísticas de presença (total de unidades, presentes, % quórum, presentes por procuração), deliberações por pauta (total de votos, resultado, vencedor/% dos votos).
+- [x] Gem de geração de PDF (`prawn`, `wicked_pdf`, ou similar) adicionada (`prawn`/`prawn-table`) e usada no relatório consolidado.
+- [x] Exportação de Resultado de Votação em PDF e Excel (tela de Resultado, 3.4.3.2) usando `prawn` e `caxlsx`.
+- [x] Disponibilizar todos esses documentos apenas após a reunião estar "Finalizada", com mensagem de espera/erro se ainda não gerados (fluxo "Detalhes da Reunião").
 
 ---
 
@@ -175,7 +176,7 @@ Nenhuma integração de vídeo existe hoje.
 - [ ] **RNF3 — Desempenho**: testes de carga simulando 1000 usuários simultâneos votando (ex. k6, Locust) contra os endpoints de `ballots` e `votes`; validar índices e possível necessidade de connection pooling/cache.
 - [ ] **RNF1 — Usabilidade mobile/idosos**: revisar frontend responsivo, tamanhos de fonte/toque, contraste, testes em dispositivos móveis reais.
 - [x] **RNF2 — Banco gratuito**: já atendido (PostgreSQL). Sem ação.
-- [ ] Cobertura de testes automatizados para os novos fluxos (upload, exportações, chat/transcrição, auditoria e jobs assíncronos persistentes) — auth, e-mail e CRUD principal já têm cobertura automatizada inicial.
+- [ ] Cobertura de testes automatizados para os novos fluxos (chat/transcrição e jobs assíncronos persistentes) — auth, e-mail, upload, auditoria, exportações e CRUD principal já têm cobertura automatizada inicial.
 
 ---
 

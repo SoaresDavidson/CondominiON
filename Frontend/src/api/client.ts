@@ -19,7 +19,8 @@ type RequestOptions = {
 }
 
 function buildUrl(path: string, params?: RequestOptions['params']) {
-  const url = new URL(`${BASE_URL}${path}`)
+  const normalizedPath = path.startsWith('/api/v1/') ? path.replace(/^\/api\/v1/, '') : path
+  const url = path.startsWith('http') ? new URL(path) : new URL(`${BASE_URL}${normalizedPath}`)
   if (params) {
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== '') url.searchParams.set(key, String(value))
@@ -41,18 +42,24 @@ async function extractErrorMessage(response: Response): Promise<string> {
 }
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  }
+  const isFormData = options.body instanceof FormData
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (!isFormData) headers['Content-Type'] = 'application/json'
 
   const token = getToken()
   if (token && !options.skipAuth) headers.Authorization = `Bearer ${token}`
 
+  let requestBody: BodyInit | undefined
+  if (options.body instanceof FormData) {
+    requestBody = options.body
+  } else if (options.body !== undefined) {
+    requestBody = JSON.stringify(options.body)
+  }
+
   const response = await fetch(buildUrl(path, options.params), {
     method: options.method ?? 'GET',
     headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body: requestBody,
   })
 
   if (response.status === 401) {
@@ -66,4 +73,23 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   if (response.status === 204) return undefined as T
 
   return (await response.json()) as T
+}
+
+export async function apiDownload(path: string, filename: string) {
+  const headers: Record<string, string> = {}
+  const token = getToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const response = await fetch(buildUrl(path), { headers })
+  if (!response.ok) throw new ApiError(response.status, await extractErrorMessage(response))
+
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }

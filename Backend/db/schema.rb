@@ -10,9 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_08_172308) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_08_190000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "access_logs", force: :cascade do |t|
+    t.bigint "meeting_id", null: false
+    t.bigint "user_id", null: false
+    t.integer "event", null: false
+    t.string "ip_address"
+    t.string "user_agent"
+    t.datetime "occurred_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["meeting_id", "occurred_at"], name: "index_access_logs_on_meeting_id_and_occurred_at"
+    t.index ["meeting_id"], name: "index_access_logs_on_meeting_id"
+    t.index ["user_id"], name: "index_access_logs_on_user_id"
+  end
 
   create_table "active_storage_attachments", force: :cascade do |t|
     t.string "name", null: false
@@ -157,6 +171,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_08_172308) do
     t.index ["meeting_id"], name: "index_votes_on_meeting_id"
   end
 
+  add_foreign_key "access_logs", "meetings"
+  add_foreign_key "access_logs", "users"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "agenda_items", "meetings"

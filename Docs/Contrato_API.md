@@ -116,7 +116,7 @@ Um novo login de Convidado/Procurador invalida o token anterior (sessao unica).
 
 Login de Administrador/Proprietario.
 
-Payload:
+Payload JSON:
 
 ```json
 {
@@ -424,6 +424,38 @@ Regras:
 - `user_id` precisa ser o proprio usuario autenticado (Administrador pode registrar presenca de terceiros).
 - O papel do usuario precisa ser compativel com `meeting_type`: `administrators_only` aceita somente
   `administrator`; `with_owners` aceita `administrator`/`owner`; `with_guests` aceita qualquer papel.
+- A entrada gera registro em `access_logs` com IP, user-agent, usuario, reuniao e data/hora.
+
+### POST `/api/v1/meetings/:id/leave`
+
+Registra saida da reuniao.
+
+Payload:
+
+```json
+{
+  "user_id": 2
+}
+```
+
+Resposta `200`: objeto `MeetingUser` com `left_at` atualizado.
+
+Regras:
+
+- `user_id` precisa ser o proprio usuario autenticado (Administrador pode registrar saida de terceiros).
+- A saida gera registro em `access_logs` com IP, user-agent, usuario, reuniao e data/hora.
+
+### GET `/api/v1/meetings/:id/access_log`
+
+Baixa o log de acessos da reuniao em HTML formatado. Somente Administrador.
+
+Resposta `200`: arquivo `text/html`.
+
+### GET `/api/v1/meetings/:id/managerial_report`
+
+Baixa o relatorio gerencial consolidado da reuniao em PDF. Somente Administrador.
+
+Resposta `200`: arquivo `application/pdf`. Resposta `422` se a reuniao ainda nao estiver `finished`.
 
 ### POST `/api/v1/meetings/:id/send_invitations`
 
@@ -589,7 +621,10 @@ Resposta `200`: objeto `User` com `active=false`.
   "meeting_id": 1,
   "title": "Item 01 - Aprovacao do Orcamento Anual",
   "description": "Votacao sobre a previsao orcamentaria do exercicio de 2026.",
-  "attachment_url": null,
+  "attachment_url": "/api/v1/agenda_items/1/attachment",
+  "attachment_filename": "orcamento.pdf",
+  "attachment_content_type": "application/pdf",
+  "attachment_byte_size": 120430,
   "position": 1,
   "created_at": "2026-07-02T21:53:14.672Z",
   "updated_at": "2026-07-02T21:53:14.672Z"
@@ -619,11 +654,12 @@ Payload:
   "agenda_item": {
     "title": "Item 01 - Aprovacao do Orcamento Anual",
     "description": "Discussao e votacao da previsao orcamentaria.",
-    "attachment_url": "https://exemplo.com/orcamento.pdf",
     "position": 1
   }
 }
 ```
+
+Tambem aceita `multipart/form-data` com `agenda_item[attachment]` para upload real de PDF.
 
 Resposta `201`: objeto `AgendaItem`.
 
@@ -631,25 +667,34 @@ Regras:
 
 - `position` e opcional; se omitido, a API atribui a proxima posicao livre da reuniao.
 - `position` precisa ser unico dentro da mesma reuniao.
+- `attachment`, quando enviado, precisa ser PDF (`application/pdf` ou extensao `.pdf`).
 - Somente Administrador pode criar/atualizar/excluir pautas.
 
 ### PATCH `/api/v1/agenda_items/:id`
 
 Atualiza uma pauta.
 
-Payload:
+Payload JSON:
 
 ```json
 {
   "agenda_item": {
     "title": "Item 01 - Orcamento Anual",
-    "description": "Descricao atualizada.",
-    "attachment_url": "https://exemplo.com/novo.pdf"
+    "description": "Descricao atualizada."
   }
 }
 ```
 
+Tambem aceita `multipart/form-data` com `agenda_item[attachment]` para substituir o PDF. Envie
+`remove_attachment=true` para remover o anexo atual.
+
 Resposta `200`: objeto `AgendaItem`.
+
+### GET `/api/v1/agenda_items/:id/attachment`
+
+Baixa o PDF anexado a pauta. Requer autenticacao e escopo da reuniao.
+
+Resposta `200`: arquivo `application/pdf`. Resposta `404` se nao houver anexo.
 
 ### DELETE `/api/v1/agenda_items/:id`
 
@@ -989,6 +1034,19 @@ Regras:
 - IP e user-agent da requisicao sao gravados para fins de auditoria (colunas `ip_address`/`user_agent` na
   tabela `ballots`), mas nao sao expostos nos payloads de resposta.
 
+### GET `/api/v1/votes/:id/export_pdf`
+
+Baixa o resultado da votacao em PDF. Somente Administrador.
+
+Resposta `200`: arquivo `application/pdf`. Resposta `422` se a reuniao da votacao ainda nao estiver `finished`.
+
+### GET `/api/v1/votes/:id/export_xlsx`
+
+Baixa o resultado da votacao em Excel (`.xlsx`). Somente Administrador.
+
+Resposta `200`: arquivo `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`. Resposta `422` se a
+reuniao da votacao ainda nao estiver `finished`.
+
 ## Fluxos Recomendados
 
 ### Login (Administrador/Proprietario)
@@ -1015,4 +1073,3 @@ Regras:
 3. `GET /api/v1/meetings/:meeting_id/votes?status=active`
 4. `POST /api/v1/votes/:vote_id/ballots`
 5. `GET /api/v1/votes/:id/result`
-

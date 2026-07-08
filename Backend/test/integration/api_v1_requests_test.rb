@@ -287,6 +287,39 @@ class ApiV1RequestsTest < ActionDispatch::IntegrationTest
     assert_response :no_content
   end
 
+  test "agenda item accepts only pdf attachment and serves it to meeting participants" do
+    pdf = Rack::Test::UploadedFile.new(Rails.root.join("test/fixtures/files/sample.pdf"), "application/pdf")
+
+    post "/api/v1/meetings/#{@meeting.id}/agenda_items",
+         params: {
+           agenda_item: {
+             title: "Pauta com PDF",
+             description: "Documento oficial",
+             attachment: pdf
+           }
+         },
+         headers: @admin_headers.except("CONTENT_TYPE")
+    assert_response :created
+    assert_equal "sample.pdf", json_response.fetch("attachment_filename")
+    attachment_url = json_response.fetch("attachment_url")
+
+    get attachment_url, headers: @owner_headers
+    assert_response :success
+    assert_equal "application/pdf", response.media_type
+
+    text_file = Rack::Test::UploadedFile.new(Rails.root.join("test/fixtures/files/not_pdf.txt"), "text/plain")
+    post "/api/v1/meetings/#{@meeting.id}/agenda_items",
+         params: {
+           agenda_item: {
+             title: "Pauta invalida",
+             attachment: text_file
+           }
+         },
+         headers: @admin_headers.except("CONTENT_TYPE")
+    assert_response :unprocessable_entity
+    assert_match(/PDF/, json_response.fetch("error").join(" "))
+  end
+
   test "agenda item with active vote cannot be destroyed" do
     @meeting.start!
     vote = @meeting.votes.create!(
@@ -400,6 +433,43 @@ class ApiV1RequestsTest < ActionDispatch::IntegrationTest
     patch "/api/v1/votes/#{vote_id}/finish", headers: @admin_headers
     assert_response :success
     assert_equal "closed", json_response.fetch("status")
+
+    patch "/api/v1/meetings/#{@meeting.id}/finish", headers: @admin_headers
+    assert_response :success
+
+    get "/api/v1/votes/#{vote_id}/export_pdf", headers: @admin_headers
+    assert_response :success
+    assert_equal "application/pdf", response.media_type
+
+    get "/api/v1/votes/#{vote_id}/export_xlsx", headers: @admin_headers
+    assert_response :success
+    assert_equal "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", response.media_type
+  end
+
+  test "meeting access log and managerial report endpoints work after presence is recorded" do
+    @meeting.start!
+
+    post "/api/v1/meetings/#{@meeting.id}/join",
+         params: json_payload(user_id: @owner.id),
+         headers: @owner_headers
+    assert_response :created
+
+    post "/api/v1/meetings/#{@meeting.id}/leave",
+         params: json_payload(user_id: @owner.id),
+         headers: @owner_headers
+    assert_response :success
+
+    get "/api/v1/meetings/#{@meeting.id}/access_log", headers: @admin_headers
+    assert_response :success
+    assert_equal "text/html", response.media_type
+    assert_includes response.body, "Entrada na reuniao"
+    assert_includes response.body, "Saida da reuniao"
+
+    @meeting.update!(status: :finished, finished_at: Time.current)
+
+    get "/api/v1/meetings/#{@meeting.id}/managerial_report", headers: @admin_headers
+    assert_response :success
+    assert_equal "application/pdf", response.media_type
   end
 
   test "vote is closed automatically when it expires" do

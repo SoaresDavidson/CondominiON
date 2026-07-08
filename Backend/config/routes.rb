@@ -17,7 +17,10 @@ Rails.application.routes.draw do
             patch :finish
             patch :cancel
             post :join
+            post :leave
             post :send_invitations
+            get :access_log
+            get :managerial_report
           end
 
           resources :agenda_items, shallow: true
@@ -26,6 +29,8 @@ Rails.application.routes.draw do
               patch :start
               patch :finish
               get :result
+              get :export_pdf
+              get :export_xlsx
             end
             resources :vote_options, shallow: true
             resources :ballots, only: %i[index create]
@@ -34,6 +39,8 @@ Rails.application.routes.draw do
 
         resources :users, shallow: true
       end
+
+      get "agenda_items/:id/attachment", to: "agenda_items#attachment", as: :agenda_item_attachment
     end
   end
 end

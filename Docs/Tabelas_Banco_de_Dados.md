@@ -3,16 +3,17 @@
 Banco: PostgreSQL  
 ORM: Active Record / Ruby on Rails  
 Fonte: `Backend/db/schema.rb`  
-Versao do schema: `2026_07_02_001200`
+Versao do schema: `2026_07_08_190000`
 
 ## Visao Geral
 
-O banco possui 8 tabelas principais:
+O banco possui 9 tabelas principais, alem das tabelas internas do ActiveStorage:
 
 - `condominiums`: condominios cadastrados.
 - `users`: usuarios do condominio.
 - `meetings`: reunioes/assembleias.
 - `meeting_users`: presencas de usuarios em reunioes.
+- `access_logs`: auditoria de entrada e saida de usuarios em reunioes.
 - `agenda_items`: pautas das reunioes.
 - `votes`: votacoes vinculadas a pautas.
 - `vote_options`: opcoes de resposta das votacoes.
@@ -27,8 +28,10 @@ condominiums 1---N meetings
 meetings 1---N agenda_items
 meetings 1---N votes
 meetings 1---N meeting_users
+meetings 1---N access_logs
 
 users 1---N meeting_users
+users 1---N access_logs
 users 1---N ballots
 users 1---N users, via proxy_for_id
 
@@ -178,6 +181,7 @@ Relacionamentos:
 - Possui muitas `agenda_items`.
 - Possui muitas `votes`.
 - Possui muitas presencas em `meeting_users`.
+- Possui muitos registros de auditoria em `access_logs`.
 
 Regras aplicadas no model:
 
@@ -220,6 +224,37 @@ Regra:
 
 - Um mesmo usuario so pode ter um registro de presenca por reuniao.
 
+## Tabela `access_logs`
+
+Registra eventos de entrada e saida de usuarios em reunioes, com dados de auditoria do acesso.
+
+| Coluna | Tipo | Obrigatorio | Padrao | Descricao |
+| --- | --- | --- | --- | --- |
+| `id` | `bigint` | Sim | auto | Identificador primario. |
+| `meeting_id` | `bigint` | Sim | - | Reuniao acessada. |
+| `user_id` | `bigint` | Sim | - | Usuario que gerou o evento. |
+| `event` | `integer` | Sim | - | Evento: `join` ou `leave`. |
+| `ip_address` | `string` | Nao | - | IP de origem. |
+| `user_agent` | `string` | Nao | - | Navegador/dispositivo informado na requisicao. |
+| `occurred_at` | `datetime` | Sim | - | Data e hora do evento. |
+| `created_at` | `datetime` | Sim | auto | Data de criacao. |
+| `updated_at` | `datetime` | Sim | auto | Data da ultima atualizacao. |
+
+Indices:
+
+| Nome | Colunas | Unico |
+| --- | --- | --- |
+| `index_access_logs_on_meeting_id` | `meeting_id` | Nao |
+| `index_access_logs_on_user_id` | `user_id` | Nao |
+| `index_access_logs_on_meeting_id_and_occurred_at` | `meeting_id`, `occurred_at` | Nao |
+
+Chaves estrangeiras:
+
+| Coluna | Referencia |
+| --- | --- |
+| `meeting_id` | `meetings.id` |
+| `user_id` | `users.id` |
+
 ## Tabela `agenda_items`
 
 Armazena as pautas vinculadas a uma reuniao.
@@ -230,7 +265,7 @@ Armazena as pautas vinculadas a uma reuniao.
 | `meeting_id` | `bigint` | Sim | - | Reuniao da pauta. |
 | `title` | `string` | Sim | - | Titulo da pauta. |
 | `description` | `text` | Nao | - | Descricao detalhada. |
-| `attachment_url` | `string` | Nao | - | URL ou caminho de anexo. |
+| `attachment_url` | `string` | Nao | - | Legado: URL/caminho externo. O fluxo atual usa ActiveStorage. |
 | `position` | `integer` | Sim | `1` | Ordem de exibicao dentro da reuniao. |
 | `created_at` | `datetime` | Sim | auto | Data de criacao. |
 | `updated_at` | `datetime` | Sim | auto | Data da ultima atualizacao. |
@@ -252,6 +287,7 @@ Relacionamentos:
 
 - Pertence a uma `meeting`.
 - Pode ter muitas `votes`.
+- Pode ter um anexo PDF via `active_storage_attachments`/`active_storage_blobs` (`has_one_attached :attachment`).
 
 Regras aplicadas no model:
 
@@ -406,15 +442,17 @@ Para respeitar as chaves estrangeiras:
 2. `meetings`
 3. `users`
 4. `meeting_users`
-5. `agenda_items`
-6. `votes`
-7. `vote_options`
-8. `ballots`
+5. `access_logs`
+6. `agenda_items`
+7. `votes`
+8. `vote_options`
+9. `ballots`
 
 ## Observacoes de Integridade
 
 - `users.email` e unico apenas dentro do mesmo condominio.
 - `meeting_users` impede presenca duplicada do mesmo usuario na mesma reuniao.
+- `access_logs` preserva cada evento de entrada/saida, sem deduplicacao.
 - `ballots` impede voto duplicado do mesmo usuario na mesma votacao.
 - `vote_options` impede duas opcoes com a mesma posicao na mesma votacao.
 - Votacoes fechadas (`secret_vote`) preservam os votos no banco, mas a API omite o historico nominal no endpoint de resultado.

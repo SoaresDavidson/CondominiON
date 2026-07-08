@@ -4,6 +4,7 @@ class Meeting < ApplicationRecord
   has_many :votes, dependent: :destroy
   has_many :meeting_users, dependent: :destroy
   has_many :users, through: :meeting_users
+  has_many :access_logs, dependent: :destroy
 
   enum :meeting_type, {
     administrators_only: 0,
@@ -48,4 +49,3 @@ class Meeting < ApplicationRecord
     errors.add(:starts_at, "nao pode estar no passado") if starts_at.present? && starts_at < Time.current
   end
 end
-

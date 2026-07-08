@@ -50,6 +50,9 @@ export interface AgendaItem {
   title: string
   description: string | null
   attachment_url: string | null
+  attachment_filename?: string
+  attachment_content_type?: string
+  attachment_byte_size?: number
   position: number
   created_at: string
   updated_at: string

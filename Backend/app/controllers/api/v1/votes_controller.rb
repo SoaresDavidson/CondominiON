@@ -2,10 +2,10 @@ module Api
   module V1
     class VotesController < BaseController
       before_action :set_meeting, only: %i[index create]
-      before_action :set_vote, only: %i[show update destroy start finish result]
+      before_action :set_vote, only: %i[show update destroy start finish result export_pdf export_xlsx]
       before_action -> { authorize_meeting_scope!(@meeting) }, only: %i[index create]
-      before_action -> { authorize_meeting_scope!(@vote.meeting) }, only: %i[show update destroy start finish result]
-      before_action -> { authorize_roles!("administrator") }, only: %i[create update destroy start finish]
+      before_action -> { authorize_meeting_scope!(@vote.meeting) }, only: %i[show update destroy start finish result export_pdf export_xlsx]
+      before_action -> { authorize_roles!("administrator") }, only: %i[create update destroy start finish export_pdf export_xlsx]
 
       def index
         votes = @meeting.votes.includes(:agenda_item, :vote_options).order(:created_at)
@@ -61,6 +61,26 @@ module Api
         }
       end
 
+      def export_pdf
+        return render_unavailable_document unless @vote.meeting.finished?
+
+        pdf = VoteResultPdf.new(@vote).render
+        send_data pdf,
+                  filename: "resultado-votacao-#{@vote.id}.pdf",
+                  type: "application/pdf",
+                  disposition: "attachment"
+      end
+
+      def export_xlsx
+        return render_unavailable_document unless @vote.meeting.finished?
+
+        xlsx = VoteResultSpreadsheet.new(@vote).render
+        send_data xlsx,
+                  filename: "resultado-votacao-#{@vote.id}.xlsx",
+                  type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                  disposition: "attachment"
+      end
+
       private
 
       def set_meeting
@@ -94,6 +114,10 @@ module Api
             cast_at: ballot.cast_at
           }
         end
+      end
+
+      def render_unavailable_document
+        render json: { error: "documentos disponiveis apenas apos a reuniao ser finalizada" }, status: :unprocessable_entity
       end
     end
   end

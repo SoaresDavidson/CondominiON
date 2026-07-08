@@ -1,4 +1,4 @@
-import { apiFetch } from './client'
+import { apiDownload, apiFetch } from './client'
 import type { Meeting, MeetingType, MeetingStatus, MeetingUser } from './types'
 
 export function listMeetings(
@@ -49,9 +49,21 @@ export function joinMeeting(id: number, userId: number) {
   return apiFetch<MeetingUser>(`/meetings/${id}/join`, { method: 'POST', body: { user_id: userId } })
 }
 
+export function leaveMeeting(id: number, userId: number) {
+  return apiFetch<MeetingUser>(`/meetings/${id}/leave`, { method: 'POST', body: { user_id: userId } })
+}
+
 export function sendInvitations(id: number, totalRecipients: number) {
   return apiFetch<{ meeting_id: number; status: string; total_recipients: number }>(
     `/meetings/${id}/send_invitations`,
     { method: 'POST', body: { total_recipients: totalRecipients } },
   )
+}
+
+export function downloadAccessLog(id: number) {
+  return apiDownload(`/meetings/${id}/access_log`, `log-reuniao-${id}.html`)
+}
+
+export function downloadManagerialReport(id: number) {
+  return apiDownload(`/meetings/${id}/managerial_report`, `relatorio-gerencial-reuniao-${id}.pdf`)
 }

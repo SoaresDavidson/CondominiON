@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { createAgendaItem, deleteAgendaItem, listAgendaItems, updateAgendaItem } from '../api/agendaItems'
+import { createAgendaItemWithAttachment, deleteAgendaItem, listAgendaItems, updateAgendaItemWithAttachment } from '../api/agendaItems'
 import { getMeeting } from '../api/meetings'
 import { Button, Card, ErrorBanner, Field, Input, LoadingState, PageHeader, Table, Textarea } from '../components/ui'
-import { ApiError } from '../api/client'
+import { ApiError, apiDownload } from '../api/client'
 import type { AgendaItem } from '../api/types'
 
 export function Pautas() {
@@ -23,12 +23,13 @@ export function Pautas() {
   const [editing, setEditing] = useState<AgendaItem | null>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [attachmentUrl, setAttachmentUrl] = useState('')
+  const [attachment, setAttachment] = useState<File | null>(null)
+  const [removeAttachment, setRemoveAttachment] = useState(false)
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['agendaItems', id] })
 
   const createMutation = useMutation({
-    mutationFn: () => createAgendaItem(id, { title, description: description || undefined, attachment_url: attachmentUrl || undefined }),
+    mutationFn: () => createAgendaItemWithAttachment(id, { title, description: description || undefined, attachment }),
     onSuccess: () => {
       invalidate()
       resetForm()
@@ -37,7 +38,12 @@ export function Pautas() {
 
   const updateMutation = useMutation({
     mutationFn: () =>
-      updateAgendaItem(editing!.id, { title, description: description || undefined, attachment_url: attachmentUrl || undefined }),
+      updateAgendaItemWithAttachment(editing!.id, {
+        title,
+        description: description || undefined,
+        attachment,
+        remove_attachment: removeAttachment,
+      }),
     onSuccess: () => {
       invalidate()
       resetForm()
@@ -53,14 +59,16 @@ export function Pautas() {
     setEditing(null)
     setTitle('')
     setDescription('')
-    setAttachmentUrl('')
+    setAttachment(null)
+    setRemoveAttachment(false)
   }
 
   function startEdit(item: AgendaItem) {
     setEditing(item)
     setTitle(item.title)
     setDescription(item.description ?? '')
-    setAttachmentUrl(item.attachment_url ?? '')
+    setAttachment(null)
+    setRemoveAttachment(false)
   }
 
   function handleSubmit(event: FormEvent) {
@@ -84,9 +92,26 @@ export function Pautas() {
           <Field label="Descricao detalhada">
             <Textarea value={description} onChange={(event) => setDescription(event.target.value)} />
           </Field>
-          <Field label="Anexo (URL do PDF)">
-            <Input value={attachmentUrl} onChange={(event) => setAttachmentUrl(event.target.value)} placeholder="https://..." />
+          <Field label="Anexo PDF">
+            <Input
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={(event) => {
+                setAttachment(event.target.files?.[0] ?? null)
+                setRemoveAttachment(false)
+              }}
+            />
           </Field>
+          {editing?.attachment_url && !attachment && (
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={removeAttachment}
+                onChange={(event) => setRemoveAttachment(event.target.checked)}
+              />
+              Remover anexo atual ({editing.attachment_filename ?? 'PDF'})
+            </label>
+          )}
           <div className="flex gap-2">
             <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
               {editing ? 'Salvar alteracoes' : 'Nova pauta'}
@@ -112,9 +137,13 @@ export function Pautas() {
               item.position,
               item.title,
               item.attachment_url ? (
-                <a className="font-semibold text-emerald-700 hover:underline" href={item.attachment_url} target="_blank" rel="noreferrer">
+                <button
+                  className="font-semibold text-emerald-700 hover:underline"
+                  type="button"
+                  onClick={() => apiDownload(item.attachment_url!, item.attachment_filename ?? `pauta-${item.id}.pdf`)}
+                >
                   Baixar
-                </a>
+                </button>
               ) : (
                 '-'
               ),
