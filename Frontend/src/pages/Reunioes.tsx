@@ -6,6 +6,7 @@ import { useAuth } from '../context/useAuth'
 import { Button, Card, ConfirmDialog, ErrorBanner, Field, Input, LoadingState, PageHeader, Select, StatusBadge, Table } from '../components/ui'
 import { meetingStatusLabels, meetingTypeLabels, formatDateTime } from '../utils/labels'
 import { ApiError } from '../api/client'
+import { getCondominium } from '../api/condominiums'
 import type { MeetingStatus, MeetingType } from '../api/types'
 
 export function Reunioes() {
@@ -19,6 +20,12 @@ export function Reunioes() {
   const [meetingType, setMeetingType] = useState<MeetingType | ''>('')
   const [status, setStatus] = useState<MeetingStatus | ''>('')
   const [meetingToStart, setMeetingToStart] = useState<{ id: number; title: string } | null>(null)
+
+    const { data: condominium } = useQuery({
+    queryKey: ['condominium', condId],
+    queryFn: () => getCondominium(condId),
+    enabled: Number.isFinite(condId),
+  })
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['meetings', condId, title, meetingType, status],
@@ -43,12 +50,12 @@ export function Reunioes() {
 
   return (
     <>
-      <PageHeader eyebrow="Gestao de reunioes" title="Reunioes do condominio" />
+      <PageHeader eyebrow="Gestão de Reuniões" title={`Últimas Reuniões do Condomínio${condominium?.name ? ` ${condominium.name}` : ''}`} />
       <ErrorBanner message={error instanceof ApiError ? error.message : startMutation.error instanceof ApiError ? startMutation.error.message : null} />
       <Card>
         <div className="grid gap-3 lg:grid-cols-4">
           <Field label="Titulo">
-            <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Lei do silencio" />
+            <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Lei do Silêncio" />
           </Field>
           <Field label="Tipo">
             <Select value={meetingType} onChange={(event) => setMeetingType(event.target.value as MeetingType | '')}>
@@ -82,7 +89,7 @@ export function Reunioes() {
           >
             Limpar
           </Button>
-          {isAdmin && <Button onClick={() => navigate(`/condominios/${condId}/reunioes/nova`)}>Agendar Reuniao</Button>}
+          {isAdmin && <Button onClick={() => navigate(`/condominios/${condId}/reunioes/nova`)}>Agendar Reunião</Button>}
         </div>
       </Card>
       <Card className="mt-4 overflow-hidden p-0">

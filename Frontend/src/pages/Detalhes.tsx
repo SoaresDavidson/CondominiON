@@ -71,7 +71,7 @@ export function Detalhes() {
 
   return (
     <>
-      <PageHeader eyebrow="Relatorios" title="Detalhes da reuniao" />
+      <PageHeader eyebrow="Relatórios" title="Detalhes da Reunião" />
       <ErrorBanner message={mutationError instanceof ApiError ? mutationError.message : null} />
       <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
         <Card>
@@ -151,7 +151,7 @@ export function Detalhes() {
         </Card>
 
         <Card>
-          <h2 className="font-bold text-slate-950">Pautas e votacoes</h2>
+          <h2 className="font-bold text-slate-950">Pautas e Votações da Reunião</h2>
           <div className="mt-3 grid gap-3">
             {(meeting.agenda_items ?? []).map((item) => {
               const vote = meeting.votes?.find((candidate) => candidate.agenda_item_id === item.id)
@@ -162,7 +162,7 @@ export function Detalhes() {
                     <div className="mt-1 flex items-center justify-between">
                       <span className="text-sm text-slate-500">{voteStatusLabels[vote.status]}</span>
                       <Button variant="secondary" onClick={() => navigate(`/votacoes/${vote.id}`)}>
-                        Ver votacao
+                        Visualizar
                       </Button>
                     </div>
                   ) : (
