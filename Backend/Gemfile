@@ -9,8 +9,17 @@ gem "rack-cors", "~> 2.0"
 gem "bootsnap", ">= 1.18", require: false
 gem "bcrypt", "~> 3.1"
 gem "jwt", "~> 2.9"
+gem "roo", "~> 2.10"
+gem "caxlsx", "~> 4.1"
+gem "prawn", "~> 2.5"
+gem "prawn-table", "~> 0.2"
+gem "csv", "~> 3.3"
 
 group :development, :test do
   gem "debug", platforms: %i[mri windows]
+end
+
+group :development do
+  gem "letter_opener_web", "~> 3.0"
 end
 

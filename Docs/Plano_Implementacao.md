@@ -6,13 +6,12 @@ Cada item referencia o requisito/caso de uso do ERS quando aplicável (RF = Requ
 
 ## Status atual
 
-**Fases 0, 1, 2 e 6 implementadas e verificadas** (suíte de testes do backend — 24 testes — verde; `npm run build`/`lint` do frontend limpos; fluxo login → condomínios → reuniões → detalhes → pautas → votação testado manualmente no browser). Pendências conhecidas dentro dessas fases:
+**Fases 0, 1, 2, 4 e 6 implementadas e verificadas** (suíte de testes do backend — 30 testes — verde; `npm run build`/`lint` do frontend limpos; fluxo login → condomínios → reuniões → detalhes → pautas → votação testado manualmente no browser; envio de e-mail testado manualmente via `letter_opener_web`). Pendências conhecidas:
 
-- Confirmação de ações destrutivas (iniciar/cancelar/finalizar reunião, excluir votação) ainda não tem modal de confirmação no frontend.
-- Envio de e-mail (senha inicial, convite de procurador, recuperação de senha) continua dependente da Fase 4 — por ora as credenciais voltam na própria resposta da API.
 - Limitação de schema já conhecida e não resolvida nesta rodada: `users.condominium_id` é 1:N (um usuário pertence a um único condomínio), o que não cobre literalmente RF7 ("usuários podem pertencer a diversos condomínios"). Resolver exigiria uma tabela `users_condominiums` — fora de escopo por ora.
 
-Fases 3 a 5 e 7 a 12 continuam pendentes (dependem de serviços externos: e-mail, videoconferência, LLM, transcrição, ou são trabalho não solicitado ainda).
+Fases 3, 5, 8, 9 (parcial), 11 e 12 (parcial) estão em andamento nesta rodada por não dependerem de credenciais externas.
+Fases 7 (videoconferência), 9 (transcrição) e 10 (ata por LLM) continuam pendentes por dependerem de credenciais/contas de serviços externos (Zoom/Meet/Teams, Whisper, Anthropic/OpenAI) que não foram fornecidas — ver notas em cada fase.
 
 ---
 
@@ -47,14 +46,14 @@ Hoje não existe login, sessão nem controle de acesso — qualquer endpoint pod
 
 ---
 
-## Fase 2 — Regras de negócio faltantes no escopo atual (backend) — quase concluída (falta confirmação de ações destrutivas na UI)
+## Fase 2 — Regras de negócio faltantes no escopo atual (backend) ✅ Concluída
 
 Mesmo dentro do subconjunto já coberto por `Contrato_API.md`, várias regras do ERS (seção 3.6) não estão implementadas.
 
 - [x] **Votação**: impedir cadastro de duas votações para o mesmo `agenda_item` na mesma reunião (regra 7 de "Cadastro de Votação"). Validação `validates :agenda_item_id, uniqueness` em [vote.rb](../Backend/app/models/vote.rb).
 - [x] **Votação**: encerramento automático ao expirar `duration_minutes`. Implementado com `ActiveJob` (adapter `:async`, sem Redis/Sidekiq — ver [close_expired_vote_job.rb](../Backend/app/jobs/close_expired_vote_job.rb)) agendado em `Vote#start!`. Evoluir para fila persistente (Solid Queue/Sidekiq) fica como hardening futuro.
 - [x] **Reunião**: ao iniciar, validar que `starts_at` não é mais de 10 minutos no futuro (fluxo "Iniciar Reunião"). Ver `Meeting#start!`.
-- [ ] **Reunião**: exigir confirmação/segundo passo antes de iniciar e antes de cancelar — **não implementado**; as ações no frontend disparam a chamada direto ao clicar (sem modal de confirmação).
+- [x] **Reunião**: exigir confirmação/segundo passo antes de iniciar e antes de cancelar (e ao finalizar, e ao excluir votação). Componente `ConfirmDialog` em [ui.tsx](../Frontend/src/components/ui.tsx), usado em [Reunioes.tsx](../Frontend/src/pages/Reunioes.tsx) (iniciar), [Detalhes.tsx](../Frontend/src/pages/Detalhes.tsx) (finalizar/cancelar) e [VotacaoForm.tsx](../Frontend/src/pages/VotacaoForm.tsx) (excluir).
 - [x] **Pautas**: impedir duas pautas com o mesmo número de "Ordem" na mesma reunião — campo `position` adicionado (ver Fase 6, já concluída).
 - [x] **Pautas**: `AgendaItem` agora só bloqueia exclusão quando há `vote` com `status="active"` vinculado; votações `waiting`/`closed` são removidas junto com a pauta. Ver `clear_inactive_votes_or_abort` em [agenda_item.rb](../Backend/app/models/agenda_item.rb).
 - [x] **Usuários**: regra "Procurador só pode ser vinculado a Proprietário adimplente" aplicada em [user.rb](../Backend/app/models/user.rb) (`proxy_for_must_be_adimplent`).
@@ -76,15 +75,28 @@ Endpoint atual (`POST /meetings/:id/send_invitations`) só recebe `total_recipie
 
 ---
 
-## Fase 4 — E-mail transacional (RF6, RF3, RNF4)
+## Fase 4 — E-mail transacional (RF6, RF3, RNF4) ✅ Concluída (disparo em lote fica para a Fase 3)
 
-Não existe nenhum `Mailer` no projeto (`actionmailer` está no `Gemfile.lock` só como dependência transitiva, sem uso).
-
-- [ ] Configurar `ActionMailer` (SMTP local para dev, ex. Mailhog/Letter Opener; provedor real para produção — SendGrid, SES, etc.).
-- [ ] Mailer de boas-vindas com senha inicial gerada aleatoriamente (cadastro de usuário).
-- [ ] Mailer de convite de procurador (link da reunião + credenciais de acesso único).
-- [ ] Mailer de convite em massa (Fase 3).
-- [ ] Mailer de recuperação de senha (Fase 0).
+- [x] `ActionMailer` configurado: dev usa `letter_opener_web` (interface em `/letter_opener`, escolhido em vez do
+  `letter_opener` puro porque o backend roda em container Docker headless e não há navegador local para o
+  `letter_opener` abrir automaticamente); teste usa delivery `:test`; produção usa `:smtp` com credenciais via
+  `ENV` (`SMTP_ADDRESS`/`SMTP_PORT`/`SMTP_USERNAME`/`SMTP_PASSWORD`, ver `.env.example`) — **nenhum provedor real
+  foi contratado/configurado**, é preciso preencher essas variáveis em produção. Ver
+  [application.rb](../Backend/config/application.rb), [development.rb](../Backend/config/environments/development.rb),
+  [production.rb](../Backend/config/environments/production.rb).
+- [x] Mailer de boas-vindas com senha inicial gerada aleatoriamente (cadastro de administrator/owner). Ver
+  [user_mailer.rb](../Backend/app/mailers/user_mailer.rb#welcome_email), disparado em
+  [users_controller.rb](../Backend/app/controllers/api/v1/users_controller.rb).
+- [x] Mailer de convite de procurador/convidado (link `/acesso/:token` + access_token). Ver
+  `UserMailer#access_invitation_email`, disparado no mesmo `UsersController#create`.
+- [ ] Mailer de convite em massa (Fase 3) — reutilizará `UserMailer#access_invitation_email` /
+  `#meeting_reminder_email` já criados aqui; disparo em lote fica para a Fase 3.
+- [x] Mailer de recuperação de senha (Fase 0). Ver `UserMailer#password_reset_email`, disparado em
+  [password_resets_controller.rb](../Backend/app/controllers/api/v1/password_resets_controller.rb).
+- [x] Resposta da API deixa de expor `initial_password`/`access_token`/`reset_token` em produção
+  (`unless Rails.env.production?`), já que agora são entregues por e-mail.
+- Testes: `test/mailers/user_mailer_test.rb` (conteúdo/assunto de cada e-mail) e asserções
+  `assert_enqueued_emails`/`assert_enqueued_email_with` nos testes de integração de usuários e password reset.
 
 ---
 

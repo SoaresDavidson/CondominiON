@@ -25,10 +25,13 @@ module Api
         user = @condominium.users.new(user_params)
         initial_credential = assign_initial_credential(user)
         user.save!
+        deliver_credential_email(user, initial_credential)
 
         payload = user.as_json
-        payload[:initial_password] = initial_credential if user.administrator? || user.owner?
-        payload[:access_token] = user.access_token if user.guest? || user.proxy?
+        unless Rails.env.production?
+          payload[:initial_password] = initial_credential if user.administrator? || user.owner?
+          payload[:access_token] = user.access_token if user.guest? || user.proxy?
+        end
 
         render json: payload, status: :created
       end
@@ -74,13 +77,20 @@ module Api
       end
 
       # Gera senha inicial (administrator/owner) ou access_token (guest/proxy, feito pelo model).
-      # TODO(Fase 4): enviar essa credencial por e-mail em vez de devolve-la na resposta.
       def assign_initial_credential(user)
         return nil unless user.administrator? || user.owner?
 
         password = SecureRandom.hex(6)
         user.password = password
         password
+      end
+
+      def deliver_credential_email(user, initial_credential)
+        if user.administrator? || user.owner?
+          UserMailer.welcome_email(user, initial_credential).deliver_later
+        elsif user.guest? || user.proxy?
+          UserMailer.access_invitation_email(user).deliver_later
+        end
       end
     end
   end

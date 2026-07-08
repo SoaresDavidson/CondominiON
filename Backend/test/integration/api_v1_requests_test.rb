@@ -74,15 +74,17 @@ class ApiV1RequestsTest < ActionDispatch::IntegrationTest
     get "/api/v1/condominiums/#{@condominium.id}/users", headers: @owner_headers
     assert_response :forbidden
 
-    post "/api/v1/condominiums/#{@condominium.id}/users",
-         params: json_payload(user: {
-           name: "Alexandre Ribas",
-           email: "alexandre@example.com",
-           role: "proxy",
-           proxy_for_id: @owner.id,
-           meeting_id: @meeting.id
-         }),
-         headers: @admin_headers
+    assert_enqueued_emails 1 do
+      post "/api/v1/condominiums/#{@condominium.id}/users",
+           params: json_payload(user: {
+             name: "Alexandre Ribas",
+             email: "alexandre@example.com",
+             role: "proxy",
+             proxy_for_id: @owner.id,
+             meeting_id: @meeting.id
+           }),
+           headers: @admin_headers
+    end
     assert_response :created
     proxy_id = json_response.fetch("id")
     assert_equal "proxy", json_response.fetch("role")
@@ -102,6 +104,37 @@ class ApiV1RequestsTest < ActionDispatch::IntegrationTest
     delete "/api/v1/users/#{proxy_id}", headers: @admin_headers
     assert_response :success
     assert_equal false, json_response.fetch("active")
+  end
+
+  test "creating an owner sends a welcome email with the initial password" do
+    assert_enqueued_emails 1 do
+      post "/api/v1/condominiums/#{@condominium.id}/users",
+           params: json_payload(user: {
+             name: "Novo Proprietario",
+             email: "novo.proprietario@example.com",
+             role: "owner",
+             lots_count: 1,
+             houses_count: 0
+           }),
+           headers: @admin_headers
+    end
+    assert_response :created
+    assert json_response.fetch("initial_password").present?
+  end
+
+  test "password reset request sends an email and the token can be used to reset the password" do
+    assert_enqueued_emails 1 do
+      post "/api/v1/password_resets", params: json_payload(email: @admin.email), headers: json_headers
+    end
+    assert_response :success
+    token = json_response.fetch("reset_token")
+    assert token.present?
+
+    patch "/api/v1/password_resets/#{token}", params: json_payload(password: "novasenha123"), headers: json_headers
+    assert_response :success
+
+    patch "/api/v1/password_resets/#{token}", params: json_payload(password: "outrasenha123"), headers: json_headers
+    assert_response :unprocessable_entity
   end
 
   test "creating a proxy for a delinquent owner is rejected" do

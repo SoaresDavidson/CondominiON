@@ -170,8 +170,9 @@ Resposta `200`:
 }
 ```
 
-Fora do ambiente de producao, a resposta tambem inclui `reset_token` para uso manual, ja que o envio por
-e-mail ainda nao esta implementado (ver `Docs/Plano_Implementacao.md`, Fase 4).
+Um e-mail de recuperacao de senha e enviado automaticamente ao usuario (ver `Docs/Plano_Implementacao.md`,
+Fase 4). Fora do ambiente de producao, a resposta tambem inclui `reset_token` para facilitar testes manuais
+sem depender de acesso a caixa de entrada.
 
 ### PATCH `/api/v1/password_resets/:token`
 
@@ -531,10 +532,11 @@ Payload de convidado:
 }
 ```
 
-Resposta `201`: objeto `User`. Para `administrator`/`owner`, inclui tambem `initial_password` (senha inicial
-gerada aleatoriamente). Para `proxy`/`guest`, inclui `access_token` (usado em `POST /meeting_accesses`). Em
-ambos os casos esses campos so aparecem na resposta de criacao — envio automatico por e-mail ainda nao esta
-implementado (ver `Docs/Plano_Implementacao.md`, Fase 4).
+Resposta `201`: objeto `User`. O sistema envia automaticamente um e-mail de boas-vindas com a senha inicial
+(`administrator`/`owner`) ou de convite com o link de acesso (`proxy`/`guest`) — ver `Docs/Plano_Implementacao.md`,
+Fase 4. Fora do ambiente de producao, a resposta tambem inclui `initial_password` (`administrator`/`owner`) ou
+`access_token` (`proxy`/`guest`) para facilitar testes manuais; em producao esses campos nao sao devolvidos na
+resposta, apenas enviados por e-mail.
 
 Regras:
 

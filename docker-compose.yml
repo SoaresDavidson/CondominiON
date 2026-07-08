@@ -5,7 +5,8 @@ services:
     container_name: condominio-backend
     restart: unless-stopped
     command: >
-      sh -c "bin/rails db:prepare &&
+      sh -c "rm -f tmp/pids/server.pid &&
+             bin/rails db:prepare &&
              bin/rails server -b 0.0.0.0 -p 3000"
     environment:
       RAILS_ENV: ${RAILS_ENV:-development}
@@ -16,6 +17,15 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-condominio}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
+      BACKEND_HOST: ${BACKEND_HOST:-localhost}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      MAILER_FROM: ${MAILER_FROM:-CondominiOn <no-reply@condominion.local>}
+      SMTP_ADDRESS: ${SMTP_ADDRESS:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_DOMAIN: ${SMTP_DOMAIN:-}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_AUTHENTICATION: ${SMTP_AUTHENTICATION:-plain}
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     volumes:

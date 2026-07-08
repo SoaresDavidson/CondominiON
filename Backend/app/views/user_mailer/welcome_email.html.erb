@@ -1,0 +1,14 @@
+<h1 style="font-size: 20px;">Bem-vindo(a), <%= @user.name %>!</h1>
+<p>Sua conta no CondominiOn foi criada. Use as credenciais abaixo para o primeiro acesso:</p>
+<table style="margin: 16px 0; border-collapse: collapse;">
+  <tr>
+    <td style="padding: 4px 12px 4px 0; color: #64748b;">E-mail</td>
+    <td style="padding: 4px 0; font-weight: bold;"><%= @user.email %></td>
+  </tr>
+  <tr>
+    <td style="padding: 4px 12px 4px 0; color: #64748b;">Senha inicial</td>
+    <td style="padding: 4px 0; font-weight: bold;"><%= @password %></td>
+  </tr>
+</table>
+<p>Recomendamos alterar sua senha assim que possivel apos o primeiro login.</p>
+<p><a href="<%= @login_url %>" style="background: #059669; color: #fff; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: bold;">Acessar o CondominiOn</a></p>

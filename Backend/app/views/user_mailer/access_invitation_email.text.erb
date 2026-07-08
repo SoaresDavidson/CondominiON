@@ -1,0 +1,6 @@
+Ola, <%= @user.name %>!
+
+Voce foi cadastrado(a) como <%= @user.proxy? ? "procurador(a)" : "convidado(a)" %> para a reuniao "<%= @meeting&.title %>" no CondominiOn.
+
+Acesse a reuniao pelo link abaixo:
+<%= @access_url %>

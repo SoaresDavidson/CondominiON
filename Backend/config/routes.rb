@@ -1,6 +1,8 @@
 Rails.application.routes.draw do
   get "/health", to: "health#show"
 
+  mount LetterOpenerWeb::Engine, at: "/letter_opener" if Rails.env.development?
+
   namespace :api do
     namespace :v1 do
       resource :sessions, only: %i[create destroy]

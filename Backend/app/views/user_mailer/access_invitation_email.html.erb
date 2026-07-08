@@ -1,0 +1,8 @@
+<h1 style="font-size: 20px;">Ola, <%= @user.name %>!</h1>
+<p>
+  Voce foi cadastrado(a) como <strong><%= @user.proxy? ? "procurador(a)" : "convidado(a)" %></strong>
+  para a reuniao <strong>"<%= @meeting&.title %>"</strong> no CondominiOn.
+</p>
+<p>Use o link abaixo para acessar a reuniao com seu token de acesso unico:</p>
+<p><a href="<%= @access_url %>" style="background: #059669; color: #fff; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: bold;">Entrar na reuniao</a></p>
+<p style="color: #64748b; font-size: 13px;">Se o botao nao funcionar, copie e cole este link no navegador: <%= @access_url %></p>
