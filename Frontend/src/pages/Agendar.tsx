@@ -28,11 +28,11 @@ export function Agendar() {
 
   return (
     <>
-      <PageHeader eyebrow="Nova reuniao" title="Agendamento de reuniao" />
+      <PageHeader eyebrow="Nova Reunião" title="Agendamento de Reunião" />
       <Card className="max-w-3xl">
         <ErrorBanner message={mutation.error instanceof ApiError ? mutation.error.message : null} />
         <form className="grid gap-4" onSubmit={handleSubmit}>
-          <Field label="Titulo">
+          <Field label="Título">
             <Input required value={title} onChange={(event) => setTitle(event.target.value)} />
           </Field>
           <Field label="Data e hora">

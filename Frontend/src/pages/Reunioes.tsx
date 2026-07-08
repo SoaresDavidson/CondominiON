@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
-import { listMeetings, startMeeting } from '../api/meetings'
+import { listMeetings, startMeeting, joinMeeting } from '../api/meetings'
+
 import { useAuth } from '../context/useAuth'
 import { Button, Card, ConfirmDialog, ErrorBanner, Field, Input, LoadingState, PageHeader, Select, StatusBadge, Table } from '../components/ui'
 import { meetingStatusLabels, meetingTypeLabels, formatDateTime } from '../utils/labels'
@@ -15,6 +16,11 @@ export function Reunioes() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const queryClient = useQueryClient()
+
+const joinMutation = useMutation({
+  mutationFn: (meetingId: number) => joinMeeting(meetingId, user!.id),
+})
+
 
   const [title, setTitle] = useState('')
   const [meetingType, setMeetingType] = useState<MeetingType | ''>('')
@@ -87,7 +93,7 @@ export function Reunioes() {
               setStatus('')
             }}
           >
-            Limpar
+            Limpar filtros
           </Button>
           {isAdmin && <Button onClick={() => navigate(`/condominios/${condId}/reunioes/nova`)}>Agendar Reunião</Button>}
         </div>
@@ -112,16 +118,32 @@ export function Reunioes() {
                 {isAdmin && meeting.status === 'scheduled' && (
                   <Button onClick={() => setMeetingToStart({ id: meeting.id, title: meeting.title })}>Iniciar</Button>
                 )}
-                {isAdmin && meeting.status === 'scheduled' && (
+                {!isAdmin && meeting.status === 'scheduled' && (
                   <Button variant="secondary" onClick={() => navigate(`/reunioes/${meeting.id}/procurador`)}>
                     Cadastrar Procurador
                   </Button>
                 )}
                 {meeting.status === 'in_progress' && (
-                  <Button onClick={() => navigate(`/reunioes/${meeting.id}`)}>Entrar</Button>
-                )}
+                   <Button
+                    onClick={async () => {
+                      if (!isAdmin) {
+                        try {
+                          await joinMutation.mutateAsync(meeting.id)
+                        } catch (error) {
+                          return
+                        }
+                      }
+                      navigate(`/reunioes/${meeting.id}`)
+                    }}
+                    disabled={joinMutation.isPending && joinMutation.variables === meeting.id}
+                  >
+                    {joinMutation.isPending && joinMutation.variables === meeting.id
+                      ? 'Entrando...'
+                      : 'Entrar'}
+                  </Button>
+)}
                 {isAdmin && meeting.status === 'in_progress' && (
-                  <Button variant="secondary" onClick={() => navigate(`/reunioes/${meeting.id}/convites`)}>
+                  <Button variant="secondary" /*onClick={() => navigate(`/reunioes/${meeting.id}/convites`)}*/ disabled>
                     Disparar convites
                   </Button>
                 )}
@@ -132,11 +154,20 @@ export function Reunioes() {
       </Card>
       <ConfirmDialog
         open={meetingToStart !== null}
-        title="Iniciar reuniao"
-        message={`Tem certeza que deseja iniciar a reuniao "${meetingToStart?.title ?? ''}"? Os participantes poderao entrar assim que ela for iniciada.`}
+        title="Iniciar Reunião"
+        message={`Tem certeza que deseja iniciar a reunião "${meetingToStart?.title ?? ''}"? Os participantes poderão entrar assim que ela for iniciada.`}
         confirmLabel="Iniciar"
-        isLoading={startMutation.isPending}
-        onConfirm={() => startMutation.mutate(meetingToStart!.id)}
+        isLoading={startMutation.isPending || joinMutation.isPending}
+        onConfirm={async () => {
+          try {
+            await startMutation.mutateAsync(meetingToStart!.id)
+            await joinMutation.mutateAsync(meetingToStart!.id)
+          } catch (error) {
+            return
+          } finally {
+            setMeetingToStart(null)
+          }
+        }}
         onCancel={() => setMeetingToStart(null)}
       />
     </>

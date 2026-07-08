@@ -49,6 +49,7 @@ export function joinMeeting(id: number, userId: number) {
   return apiFetch<MeetingUser>(`/meetings/${id}/join`, { method: 'POST', body: { user_id: userId } })
 }
 
+
 export function leaveMeeting(id: number, userId: number) {
   return apiFetch<MeetingUser>(`/meetings/${id}/leave`, { method: 'POST', body: { user_id: userId } })
 }

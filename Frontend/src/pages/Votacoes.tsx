@@ -33,7 +33,7 @@ export function Votacoes() {
 
   return (
     <>
-      <PageHeader eyebrow="Gestao de votacoes" title={meeting ? `Votacoes - ${meeting.title}` : 'Votacoes cadastradas'} />
+      <PageHeader eyebrow="Gestão de Votações" title={meeting ? `Votações - Reunião ${meeting.title}` : 'Votações Cadastradas'} />
       <ErrorBanner message={error instanceof ApiError ? error.message : startMutation.error instanceof ApiError ? startMutation.error.message : null} />
       <Card>
         <div className="grid gap-3 lg:grid-cols-5">
@@ -47,9 +47,9 @@ export function Votacoes() {
           </Select>
         </div>
         <div className="mt-4 flex gap-2">
-          {isAdmin && <Button onClick={() => navigate(`/reunioes/${id}/votacoes/nova`)}>Nova votacao</Button>}
+          {isAdmin && <Button onClick={() => navigate(`/reunioes/${id}/votacoes/nova`)}>Nova Votação</Button>}
           <Button variant="secondary" onClick={() => navigate(`/reunioes/${id}`)}>
-            Voltar para a reuniao
+            Voltar para a Reunião
           </Button>
         </div>
       </Card>

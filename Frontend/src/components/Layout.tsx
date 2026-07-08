@@ -4,7 +4,7 @@ import { useAuth } from '../context/useAuth'
 import { roleLabels } from '../utils/labels'
 
 const navItems = [
-  { to: '/condominios', label: 'Condominios', icon: Building2 },
+  { to: '/condominios', label: 'Condomínios', icon: Building2 },
 ]
 
 export function Layout() {
@@ -26,7 +26,7 @@ export function Layout() {
             </div>
             <div>
               <p className="text-lg font-bold text-slate-950">CondominiON</p>
-              <p className="text-sm text-slate-500">Assembleias e votacoes</p>
+              <p className="text-sm text-slate-500">Assembleias e Votações</p>
             </div>
           </div>
 

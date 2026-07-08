@@ -10,7 +10,7 @@ export function Condominios() {
 
   return (
     <>
-      <PageHeader eyebrow="Selecao de ambiente" title="Escolha o condominio" />
+      <PageHeader eyebrow="Selecao de ambiente" title="Escolha o condomínio" />
       <ErrorBanner message={error instanceof ApiError ? error.message : null} />
       {isLoading ? (
         <LoadingState />

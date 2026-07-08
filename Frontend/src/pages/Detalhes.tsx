@@ -92,19 +92,25 @@ export function Detalhes() {
           </dl>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            {meeting.status === 'in_progress' && !isAdmin && (
+            {/* {meeting.status === 'in_progress' && !isAdmin && (
               <Button onClick={() => joinMutation.mutate()} disabled={joinMutation.isPending}>
-                Entrar na reuniao
+                Entrar na Reunião
               </Button>
-            )}
+            )} */}
             {meeting.status === 'in_progress' && !isAdmin && (
-              <Button variant="secondary" onClick={() => leaveMutation.mutate()} disabled={leaveMutation.isPending}>
-                Registrar saida
+              <Button  onClick={() => leaveMutation.mutate()} disabled={leaveMutation.isPending}>
+                Sair da Reunião
               </Button>
             )}
-            {isAdmin && meeting.status === 'in_progress' && (
+
+              {isAdmin && meeting.status === 'in_progress' && (
               <Button onClick={() => setPendingAction('finish')} disabled={finishMutation.isPending}>
-                Finalizar reuniao
+                Finalizar Reunião
+              </Button>
+            )}
+              {isAdmin && meeting.status === 'in_progress' && (
+            <Button variant="secondary" onClick={() => navigate(`/reunioes/${meetingId}/votacoes`)} >
+                Gerenciar Votações
               </Button>
             )}
             {isAdmin && meeting.status === 'scheduled' && (
@@ -114,7 +120,7 @@ export function Detalhes() {
             )}
             {isAdmin && (
               <Button variant="secondary" onClick={() => navigate(`/reunioes/${meetingId}/pautas`)}>
-                Gerenciar pautas
+                Gerenciar Pautas
               </Button>
             )}
           </div>
@@ -126,14 +132,15 @@ export function Detalhes() {
                 {isAdmin && (
                   <Button
                     variant="secondary"
-                    onClick={() => managerialReportMutation.mutate()}
-                    disabled={managerialReportMutation.isPending}
+                    // onClick={() => managerialReportMutation.mutate()}
+                    // disabled={managerialReportMutation.isPending}
+                    disabled
                   >
-                    Relatorio gerencial
+                    Relatório gerencial
                   </Button>
                 )}
                 {isAdmin && (
-                  <Button variant="secondary" onClick={() => accessLogMutation.mutate()} disabled={accessLogMutation.isPending}>
+                  <Button variant="secondary" /*onClick={() => accessLogMutation.mutate()} */ disabled /*disabled={accessLogMutation.isPending} */>
                     Gerar Log
                   </Button>
                 )}
@@ -161,12 +168,10 @@ export function Detalhes() {
                   {vote ? (
                     <div className="mt-1 flex items-center justify-between">
                       <span className="text-sm text-slate-500">{voteStatusLabels[vote.status]}</span>
-                      <Button variant="secondary" onClick={() => navigate(`/votacoes/${vote.id}`)}>
-                        Visualizar
-                      </Button>
+                       {vote.status === 'active' && <Button onClick={() => navigate(`/votacoes/${vote.id}/votar`)}>Votar</Button>}
                     </div>
                   ) : (
-                    <p className="mt-1 text-sm text-slate-500">Sem votacao cadastrada</p>
+                    <p className="mt-1 text-sm text-slate-500">Sem votação cadastrada</p>
                   )}
                 </div>
               )

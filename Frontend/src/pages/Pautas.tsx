@@ -81,7 +81,7 @@ export function Pautas() {
 
   return (
     <>
-      <PageHeader eyebrow="Gestão de pautas" title={meeting ? `Pautas - ${meeting.title}` : 'Pautas da reuniao'} />
+      <PageHeader eyebrow="Gestão de pautas" title={meeting ? `Pautas - Reunião ${meeting.title}` : 'Pautas da reuniao'} />
       <ErrorBanner message={error instanceof ApiError ? error.message : mutationError instanceof ApiError ? mutationError.message : null} />
 
       <Card className="max-w-2xl">

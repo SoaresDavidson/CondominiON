@@ -108,7 +108,7 @@ export function VotacaoForm() {
 
   return (
     <>
-      <PageHeader eyebrow="Votacao" title={isCreating ? 'Cadastro de votacao' : readOnly ? 'Visualizacao de votacao' : 'Edicao de votacao'} />
+      <PageHeader eyebrow="Votacao" title={isCreating ? 'Cadastro de Votação' : readOnly ? 'Visualização de Votação' : 'Edição de Votação'} />
       <Card>
         <ErrorBanner message={mutationError instanceof ApiError ? mutationError.message : null} />
         <form className="grid gap-4 lg:grid-cols-2" onSubmit={handleSubmit}>
@@ -172,7 +172,7 @@ export function VotacaoForm() {
                 <div className="flex gap-2">
                   <Input placeholder="Candidato Silva" value={newOption} onChange={(event) => setNewOption(event.target.value)} />
                   <Button type="button" variant="secondary" onClick={addOption}>
-                    Adicionar opcao
+                    Adicionar opcão
                   </Button>
                 </div>
               )}

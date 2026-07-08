@@ -31,7 +31,7 @@ export function Resultado() {
 
   return (
     <>
-      <PageHeader eyebrow="Apuracao" title="Resultado da votacao" />
+      <PageHeader eyebrow="Apuração" title="Resultado da Votação" />
       <ErrorBanner
         message={
           pdfMutation.error instanceof ApiError
@@ -46,7 +46,7 @@ export function Resultado() {
           {[
             ['Status', voteStatusLabels[vote.status]],
             ['Visibilidade', visibilityLabels[vote.visibility]],
-            ['Inicio', formatDateTime(vote.started_at)],
+            ['Início', formatDateTime(vote.started_at)],
             ['Encerramento', formatDateTime(vote.closed_at)],
           ].map(([label, value]) => (
             <div key={label} className="rounded-md bg-slate-50 p-3">
@@ -58,7 +58,7 @@ export function Resultado() {
       </Card>
       <Card className="mt-4 p-0">
         <Table
-          headers={['Opcao', 'Qtd. votos', 'Peso total', '% Peso', 'Resultado']}
+          headers={['Opção', 'Qtd. votos', 'Peso total', '% Peso', 'Resultado']}
           rows={summary.map((item) => [
             item.description,
             item.ballots_count,
@@ -71,7 +71,7 @@ export function Resultado() {
       {vote.visibility === 'open_vote' && (
         <Card className="mt-4 p-0">
           <Table
-            headers={['Participante', 'Voto', 'Peso', 'Horario do voto']}
+            headers={['Participante', 'Voto', 'Peso', 'Horário do voto']}
             rows={ballots.map((ballot) => [ballot.user.name, ballot.option, ballot.weight.toFixed(2), formatDateTime(ballot.cast_at)])}
           />
         </Card>
@@ -88,7 +88,7 @@ export function Resultado() {
           </div>
         )}
         <Button variant="secondary" onClick={() => navigate(`/reunioes/${vote.meeting_id}/votacoes`)}>
-          Voltar para votacoes
+          Voltar para votações
         </Button>
       </div>
     </>
