@@ -667,7 +667,9 @@ Regras:
 
 - `position` e opcional; se omitido, a API atribui a proxima posicao livre da reuniao.
 - `position` precisa ser unico dentro da mesma reuniao.
-- `attachment`, quando enviado, precisa ser PDF (`application/pdf` ou extensao `.pdf`).
+- `attachment`, quando enviado, precisa ser PDF: extensao `.pdf`, `Content-Type` `application/pdf` **e** assinatura
+  de bytes `%PDF-` no inicio do arquivo (as tres checagens precisam passar; qualquer uma delas falhando rejeita
+  o upload com `422`).
 - Somente Administrador pode criar/atualizar/excluir pautas.
 
 ### PATCH `/api/v1/agenda_items/:id`

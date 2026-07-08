@@ -4,11 +4,14 @@ import { downloadVoteResultPdf, downloadVoteResultXlsx, getVoteResult } from '..
 import { Button, Card, ErrorBanner, LoadingState, PageHeader, Table } from '../components/ui'
 import { formatDateTime, visibilityLabels, voteStatusLabels } from '../utils/labels'
 import { ApiError } from '../api/client'
+import { useAuth } from '../context/useAuth'
 
 export function Resultado() {
   const { id } = useParams<{ id: string }>()
   const voteId = Number(id)
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'administrator'
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['voteResult', voteId],
@@ -74,14 +77,16 @@ export function Resultado() {
         </Card>
       )}
       <div className="mt-4">
-        <div className="mb-3 flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => pdfMutation.mutate()} disabled={pdfMutation.isPending}>
-            Exportar PDF
-          </Button>
-          <Button variant="secondary" onClick={() => xlsxMutation.mutate()} disabled={xlsxMutation.isPending}>
-            Exportar Excel
-          </Button>
-        </div>
+        {isAdmin && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => pdfMutation.mutate()} disabled={pdfMutation.isPending}>
+              Exportar PDF
+            </Button>
+            <Button variant="secondary" onClick={() => xlsxMutation.mutate()} disabled={xlsxMutation.isPending}>
+              Exportar Excel
+            </Button>
+          </div>
+        )}
         <Button variant="secondary" onClick={() => navigate(`/reunioes/${vote.meeting_id}/votacoes`)}>
           Voltar para votacoes
         </Button>

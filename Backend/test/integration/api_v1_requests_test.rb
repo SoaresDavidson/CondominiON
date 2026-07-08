@@ -188,6 +188,8 @@ class ApiV1RequestsTest < ActionDispatch::IntegrationTest
          headers: @owner_headers
     assert_response :created
     assert_equal @owner.id, json_response.fetch("user_id")
+    refute json_response.fetch("user").key?("password_digest")
+    refute json_response.fetch("user").key?("active_session_token")
 
     post "/api/v1/meetings/#{meeting_id}/send_invitations",
          params: json_payload(total_recipients: 12),
@@ -313,6 +315,18 @@ class ApiV1RequestsTest < ActionDispatch::IntegrationTest
            agenda_item: {
              title: "Pauta invalida",
              attachment: text_file
+           }
+         },
+         headers: @admin_headers.except("CONTENT_TYPE")
+    assert_response :unprocessable_entity
+    assert_match(/PDF/, json_response.fetch("error").join(" "))
+
+    fake_pdf = Rack::Test::UploadedFile.new(Rails.root.join("test/fixtures/files/fake.pdf"), "application/pdf")
+    post "/api/v1/meetings/#{@meeting.id}/agenda_items",
+         params: {
+           agenda_item: {
+             title: "Pauta com PDF falso",
+             attachment: fake_pdf
            }
          },
          headers: @admin_headers.except("CONTENT_TYPE")
@@ -458,6 +472,7 @@ class ApiV1RequestsTest < ActionDispatch::IntegrationTest
          params: json_payload(user_id: @owner.id),
          headers: @owner_headers
     assert_response :success
+    refute json_response.fetch("user").key?("password_digest")
 
     get "/api/v1/meetings/#{@meeting.id}/access_log", headers: @admin_headers
     assert_response :success

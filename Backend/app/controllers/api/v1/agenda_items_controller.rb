@@ -22,7 +22,7 @@ module Api
         attachment = attrs.delete(:attachment)
         attrs[:position] ||= (@meeting.agenda_items.maximum(:position) || 0) + 1
         item = @meeting.agenda_items.new(attrs)
-        item.attachment.attach(attachment) if attachment.present?
+        attach_pdf!(item, attachment) if attachment.present?
         item.save!
 
         render json: agenda_item_payload(item), status: :created
@@ -32,7 +32,7 @@ module Api
         attrs = agenda_item_params
         attachment = attrs.delete(:attachment)
         @agenda_item.assign_attributes(attrs)
-        @agenda_item.attachment.attach(attachment) if attachment.present?
+        attach_pdf!(@agenda_item, attachment) if attachment.present?
         @agenda_item.attachment.purge if params[:remove_attachment].to_s == "true"
         @agenda_item.save!
 
@@ -54,6 +54,35 @@ module Api
       end
 
       private
+
+      PDF_MAGIC_BYTES = "%PDF-".freeze
+
+      # A checagem de assinatura de bytes precisa acontecer aqui, antes do attach, com o IO
+      # bruto do upload: uma vez chamado item.attachment.attach(...), o blob so e gravado no
+      # storage service no after_save do registro pai, entao tentar ler o conteudo de volta
+      # (via attachment.download) durante uma validacao do model falha com
+      # ActiveStorage::FileNotFoundError.
+      def attach_pdf!(item, uploaded_file)
+        unless valid_pdf_upload?(uploaded_file)
+          item.errors.add(:attachment, "deve ser um arquivo PDF")
+          raise ActiveRecord::RecordInvalid, item
+        end
+
+        item.attachment.attach(uploaded_file)
+      end
+
+      def valid_pdf_upload?(uploaded_file)
+        return false unless uploaded_file.respond_to?(:read)
+
+        extension_ok = File.extname(uploaded_file.original_filename.to_s).delete_prefix(".").downcase == "pdf"
+        content_type_ok = uploaded_file.content_type == "application/pdf"
+
+        uploaded_file.rewind
+        signature = uploaded_file.read(PDF_MAGIC_BYTES.bytesize)
+        uploaded_file.rewind
+
+        extension_ok && content_type_ok && signature == PDF_MAGIC_BYTES
+      end
 
       def set_meeting
         @meeting = Meeting.find(params[:meeting_id])

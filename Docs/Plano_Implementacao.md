@@ -6,12 +6,32 @@ Cada item referencia o requisito/caso de uso do ERS quando aplicável (RF = Requ
 
 ## Status atual
 
-**Fases 0, 1, 2, 4, 5, 6, 8 e 11 implementadas e verificadas** (suíte de testes do backend — 32 testes — verde; `npm run build`/`lint` do frontend limpos; fluxo login → condomínios → reuniões → detalhes → pautas → votação testado manualmente no browser; envio de e-mail testado manualmente via `letter_opener_web`). Pendências conhecidas:
+**Fases 0, 1, 2, 4, 5, 6, 8 e 11 implementadas e verificadas** (suíte de testes do backend — 32 testes — verde; `npm run build`/`lint` do frontend limpos; fluxo login → condomínios → reuniões → detalhes → pautas → votação testado manualmente no browser; envio de e-mail testado manualmente via `letter_opener_web`). Uma auditoria completa dessas fases foi feita revisando código, rodando os testes e exercitando os fluxos manualmente (upload de PDF, log de acesso, relatório gerencial, exportações), o que revelou e corrigiu 3 bugs reais que não eram cobertos pelos testes existentes: validação de PDF contornável por spoofing (Fase 5), `ActiveStorage::FileNotFoundError` ao validar o anexo (Fase 5), vazamento de `password_digest`/tokens de sessão via `join`/`leave` (Fase 8), e botões de exportação visíveis para papéis sem permissão (Fase 11) — detalhes em cada fase. Pendências conhecidas:
 
 - Limitação de schema já conhecida e não resolvida nesta rodada: `users.condominium_id` é 1:N (um usuário pertence a um único condomínio), o que não cobre literalmente RF7 ("usuários podem pertencer a diversos condomínios"). Resolver exigiria uma tabela `users_condominiums` — fora de escopo por ora.
 
 Fases 3, 7, 9, 10 e 12 continuam pendentes ou parcialmente preparadas. As dependências de parsing/relatórios (`roo`, `csv`, `caxlsx`, `prawn`) e a base do `ActiveStorage` já existem no projeto, mas ainda não há fluxo funcional completo para convites em massa, videoconferência, chat/transcrição, ata por LLM ou testes não-funcionais formais.
 Fases 7 (videoconferência), 9 (transcrição) e 10 (ata por LLM) também dependem de credenciais/contas de serviços externos (Zoom/Meet/Teams, Whisper, Anthropic/OpenAI) que não foram fornecidas — ver notas em cada fase.
+
+### Resumo do que já existe
+
+- Autenticação/autorização por JWT, login permanente para Administrador/Proprietário e acesso único para Convidado/Procurador.
+- Frontend real com rotas protegidas, chamadas à API, estados de erro/carregamento e formulários principais.
+- Regras de negócio de votação, reunião, pauta, procurador, auditoria de voto e confirmação de ações críticas.
+- E-mail transacional para boas-vindas, convite individual de convidado/procurador e recuperação de senha.
+- Pautas com ordenação, upload real de PDF via ActiveStorage, validação de tipo e download autenticado.
+- Auditoria de acessos à reunião com `access_logs`, registro de entrada/saída e exportação HTML.
+- Relatório gerencial consolidado em PDF e exportação de resultado de votação em PDF/XLSX.
+- Cobertura automatizada inicial dos principais fluxos de API, auth, e-mail, upload, auditoria e exportações.
+
+### Resumo do que falta
+
+- Convites em massa: upload/processamento real de `.csv`/`.xlsx`, validação linha a linha, criação/vínculo de usuários e disparo de e-mails em lote.
+- Videoconferência embutida: escolha/configuração de provedor, credenciais de sala, player/SDK no frontend e integração de presença.
+- Chat em tempo real e exportação de histórico.
+- Transcrição automática e endpoint de download de transcrição.
+- Ata gerada por LLM, incluindo persistência do documento gerado.
+- Não-funcionais formais: teste de carga com 1000 usuários, revisão mobile/acessibilidade para idosos e fila persistente para jobs críticos.
 
 ---
 
@@ -64,7 +84,7 @@ Mesmo dentro do subconjunto já coberto por `Contrato_API.md`, várias regras do
 
 ## Fase 3 — Disparo de Convites em Massa (RF6, 3.4.1.5)
 
-Endpoint atual (`POST /meetings/:id/send_invitations`) só recebe `total_recipients` e devolve `202 queued` — não processa arquivo nem envia nada.
+Endpoint atual (`POST /meetings/:id/send_invitations`) só recebe `total_recipients` e devolve `202 queued` — não processa arquivo nem envia nada. A tela `Convites` já exibe seletor de `.csv`/`.xlsx`, mas ainda não envia o arquivo para a API.
 
 - [ ] Adicionar upload real de arquivo (`multipart/form-data`) para planilha `.csv`/`.xlsx`.
 - [x] Adicionar gem de parsing (`roo` ou `caxlsx`/`csv` nativo para `.csv`). Dependências `roo` e `csv` já estão no [Gemfile](../Backend/Gemfile); o uso no endpoint ainda falta nos itens abaixo.
@@ -106,7 +126,15 @@ Endpoint atual (`POST /meetings/:id/send_invitations`) só recebe `total_recipie
 download autenticado.
 
 - [x] Adicionar base do `ActiveStorage` (ou S3/Carrierwave). As tabelas/configuração do ActiveStorage já existem e o fluxo de pauta usa `has_one_attached :attachment`.
-- [x] Validar que o anexo é PDF (tipo de conteúdo e/ou extensão). Ver [agenda_item.rb](../Backend/app/models/agenda_item.rb).
+- [x] Validar que o anexo é PDF (tipo de conteúdo, extensão **e** assinatura de bytes `%PDF-`). Ver
+  [agenda_item.rb](../Backend/app/models/agenda_item.rb) (checagem de metadados) e
+  [agenda_items_controller.rb](../Backend/app/controllers/api/v1/agenda_items_controller.rb#attach_pdf!) (checagem de
+  assinatura antes do `attach`). **Corrigido em revisão**: a validação original usava `&&` em vez de `||` na
+  condição de rejeição, então bastava falsificar o `Content-Type` OU a extensão (não as duas) para burlar o
+  filtro; a assinatura de bytes tampouco existia. Também corrigido: checar o conteúdo via `attachment.download`
+  dentro de uma `validate` do model falha com `ActiveStorage::FileNotFoundError`, pois o blob só é gravado no
+  storage service no `after_save` do registro pai — por isso a checagem de assinatura roda no controller, antes
+  do `attach`, usando o IO bruto do upload.
 - [x] Servir o download do anexo por link autenticado para participantes da reunião. Ver `GET /api/v1/agenda_items/:id/attachment`.
 - [x] Atualizar `Contrato_API.md` e `Tabelas_Banco_de_Dados.md` para refletir o novo mecanismo de upload.
 
@@ -140,6 +168,12 @@ Nenhuma integração de vídeo existe hoje.
 - [x] Nova tabela `access_logs` com `user_id`, `ip_address`, `user_agent`, `meeting_id`, `event` (entrada/saída), `occurred_at`.
 - [x] Registrar entrada/saída da reunião (`join`/`leave`) com IP/browser, mantendo `meeting_users` como estado de presença.
 - [x] Endpoint/ação `Gerar Log da Reunião` retornando HTML formatado para download (conforme protótipo 3.4.1.8).
+- **Falha de segurança corrigida em revisão**: `join`/`leave` respondiam com `presence.as_json(include: :user)`,
+  que ignora o `User#as_json` sobrescrito e expunha `password_digest`, `active_session_token` e
+  `reset_password_token` de qualquer usuário que entrasse/saísse de uma reunião. Corrigido em
+  [meetings_controller.rb](../Backend/app/controllers/api/v1/meetings_controller.rb#presence_payload) para montar
+  o payload combinando `presence.as_json` com `presence.user.as_json` (que já esconde esses campos). Teste de
+  regressão adicionado em `test/integration/api_v1_requests_test.rb`.
 
 ---
 
@@ -168,6 +202,10 @@ Nenhuma integração de vídeo existe hoje.
 - [x] Gem de geração de PDF (`prawn`, `wicked_pdf`, ou similar) adicionada (`prawn`/`prawn-table`) e usada no relatório consolidado.
 - [x] Exportação de Resultado de Votação em PDF e Excel (tela de Resultado, 3.4.3.2) usando `prawn` e `caxlsx`.
 - [x] Disponibilizar todos esses documentos apenas após a reunião estar "Finalizada", com mensagem de espera/erro se ainda não gerados (fluxo "Detalhes da Reunião").
+- **Corrigido em revisão**: a tela de Resultado exibia os botões "Exportar PDF"/"Exportar Excel" para qualquer
+  papel, mas o backend exige `administrator` — não-administradores viam o botão e recebiam um erro 403 ao
+  clicar. Ver [Resultado.tsx](../Frontend/src/pages/Resultado.tsx), agora oculto atrás de `isAdmin`, no mesmo
+  padrão já usado em `Detalhes.tsx` para "Relatorio gerencial"/"Gerar Log".
 
 ---
 
@@ -182,14 +220,8 @@ Nenhuma integração de vídeo existe hoje.
 
 ## Priorização sugerida
 
-1. **Fase 0 (Auth)** — nada mais faz sentido sem controle de acesso.
-2. **Fase 1 (Frontend real)** — sem isso o backend fica inacessível na prática.
-3. **Fase 2 (regras de negócio faltantes)** — corrige o que já deveria funcionar dentro do escopo atual.
-4. **Fase 6 (campo Ordem em pautas)** — pequena, mas bloqueia consistência com o ERS.
-5. **Fase 3 + Fase 4 (convites em massa + e-mail)** — fluxo de entrada de usuários na plataforma.
-6. **Fase 5 (upload de anexo real)**.
-7. **Fase 7 (videoconferência)** — dependência externa grande, mas central ao produto.
-8. **Fase 8 + Fase 9 (log, chat, transcrição)**.
-9. **Fase 10 (Ata por LLM)**.
-10. **Fase 11 (relatório consolidado/exportações)**.
-11. **Fase 12 (não-funcionais)** — contínuo, mas load testing formal fica para o fim, quando os fluxos reais existirem.
+1. **Fase 3 (convites em massa)** — próximo fluxo funcional sem depender de conta externa; já há tela inicial, gems de parsing e mailers reutilizáveis.
+2. **Fase 7 (videoconferência)** — exige decisão de provedor e credenciais; desbloqueia presença mais fiel e transcrição.
+3. **Fase 9 (chat em tempo real)** — pode ser implementada localmente com ActionCable; transcrição automática depende de serviço externo.
+4. **Fase 10 (ata por LLM)** — depende de provedor/credenciais de LLM e da transcrição ou de outro texto-base confiável.
+5. **Fase 12 (não-funcionais)** — executar teste de carga, revisar mobile/acessibilidade e evoluir jobs críticos para fila persistente quando os fluxos finais estiverem fechados.

@@ -11,12 +11,18 @@ class AgendaItem < ApplicationRecord
 
   private
 
+  # Checagem de metadados apenas (extensao/content-type), sem I/O de storage: o blob so e
+  # efetivamente gravado no service no after_save do registro pai, entao ler o conteudo aqui
+  # (em plena validacao) falharia com ActiveStorage::FileNotFoundError. A checagem de
+  # assinatura de bytes (mais confiavel contra spoofing) e feita em AgendaItemsController
+  # antes do attach, quando o IO bruto do upload ainda esta disponivel.
   def attachment_must_be_pdf
     return unless attachment.attached?
 
-    if attachment.blob.content_type != "application/pdf" && attachment.blob.filename.extension.downcase != "pdf"
-      errors.add(:attachment, "deve ser um arquivo PDF")
-    end
+    correct_extension = attachment.blob.filename.extension.downcase == "pdf"
+    correct_content_type = attachment.blob.content_type == "application/pdf"
+
+    errors.add(:attachment, "deve ser um arquivo PDF") unless correct_extension && correct_content_type
   end
 
   def clear_inactive_votes_or_abort

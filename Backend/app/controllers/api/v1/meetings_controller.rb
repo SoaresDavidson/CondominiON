@@ -65,7 +65,7 @@ module Api
         end
         create_access_log!(user, :join)
 
-        render json: presence.as_json(include: :user), status: :created
+        render json: presence_payload(presence), status: :created
       end
 
       def leave
@@ -74,7 +74,7 @@ module Api
         presence.update!(left_at: Time.current)
         create_access_log!(user, :leave)
 
-        render json: presence.as_json(include: :user)
+        render json: presence_payload(presence)
       end
 
       def send_invitations
@@ -157,6 +157,14 @@ module Api
           ip_address: request.remote_ip,
           user_agent: request.user_agent
         )
+      end
+
+      # `presence.as_json(include: :user)` nao respeita o User#as_json sobrescrito (que
+      # esconde password_digest/tokens), pois o Rails serializa registros incluidos via
+      # serializable_hash bruto. Montar o hash manualmente garante que o User#as_json seguro
+      # seja usado.
+      def presence_payload(presence)
+        presence.as_json.merge(user: presence.user.as_json)
       end
     end
   end
